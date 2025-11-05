@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "A modern, AI-powered student dashboard for BITS Pilani",
   "type": "module",
-  "homepage": "https://heswaram.github.io/bits-pilani-dashboard",
+  "homepage": "https://2021wa15025.github.io/bits-pilani-dashboard",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
