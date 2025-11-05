@@ -74,7 +74,7 @@ export function LoginPage({ onLogin, onSwitchToAdmin }: LoginPageProps) {
           {/* Logo & Heading */}
           <div className="text-center mb-4">
             <ImageWithFallback
-              src="/login-logo.png"
+              src={`${import.meta.env.BASE_URL}login-logo.png`}
               alt="BITS Pilani Work Integrated Learning Programmes"
               className="w-full h-auto object-contain max-w-xs mx-auto"
             />
