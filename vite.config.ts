@@ -5,7 +5,7 @@ import { fileURLToPath, URL } from 'node:url'
 
 export default defineConfig({
   plugins: [react()],
-  base: '/bits-pilani-dashboard/',
+  base: "/",
   resolve: {
     alias: {
       "@": fileURLToPath(new URL('./', import.meta.url)),
