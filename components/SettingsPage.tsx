@@ -7,7 +7,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Switch } from './ui/switch';
 import { Separator } from './ui/separator';
-import { AccessibilitySettings } from './AccessibilitySettings';
+import AccessibilitySettings from './AccessibilitySettings';
 import { 
   User, 
   Palette, 
@@ -347,7 +347,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                         </p>
                       </div>
                       <Switch
-                        checked={privacy[item.key as keyof typeof privacy]}
+                        checked={typeof privacy[item.key as keyof typeof privacy] === "boolean" ? privacy[item.key as keyof typeof privacy] as boolean : false}
                         onCheckedChange={(checked) => 
                           setPrivacy(prev => ({ ...prev, [item.key]: checked }))
                         }
