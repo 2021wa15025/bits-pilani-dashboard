@@ -1,7 +1,7 @@
-import{l as r}from"./index-8JrxHvHV.js";/**
+import{l as r}from"./index-EOvVHa2o.js";/**
  * @license lucide-react v0.336.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
  */const e=r("Award",[["circle",{cx:"12",cy:"8",r:"6",key:"1vp47v"}],["path",{d:"M15.477 12.89 17 22l-5-3-5 3 1.523-9.11",key:"em7aur"}]]);export{e as A};
-//# sourceMappingURL=award-G53YVx2W.js.map
+//# sourceMappingURL=award-C4vDJOlG.js.map
