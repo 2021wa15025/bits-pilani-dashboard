@@ -9,7 +9,7 @@ import { GreetingCard } from "./components/GreetingCard";
 import { DashboardStats } from "./components/DashboardStats";
 import { CourseCard } from "./components/CourseCard";
 import { RecentlyAccessed } from "./components/RecentlyAccessed";
-import { AIAssistant } from "./components/AIAssistant_Simple";
+import { AIAssistant } from "./components/AIAssistant";
 import { AnnouncementsWidget } from "./components/widgets/AnnouncementsWidget";
 import { ProfileEditDialog } from "./components/ProfileEditDialog";
 import { AnnouncementsDialog } from "./components/AnnouncementsDialog";
@@ -19,7 +19,7 @@ import { cn } from "./components/ui/utils";
 import { Toaster } from "./components/ui/sonner";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { LoadingSpinner } from "./components/LoadingSpinner";
-import MainContentAccessibilitySettings from "./components/MainContentAccessibilitySettings";
+// import MainContentAccessibilitySettings from "./components/MainContentAccessibilitySettings";
 
 // Lazy load page components for better performance
 const CoursesPage = lazy(() => import("./components/CoursesPage"));
@@ -169,7 +169,9 @@ function AppContent() {
           console.error("Failed to fetch events from backend:", error);
         }
 
-        // Fetch announcements from backend - ALWAYS use backend data
+        // Fetch announcements - try API first, then use localStorage for local development
+        let announcementsLoaded = false;
+        
         try {
           const response = await fetch(
             `https://${projectId}.supabase.co/functions/v1/make-server-917daa5d/announcements`,
@@ -182,7 +184,6 @@ function AppContent() {
           
           const data = await response.json();
           
-          // ALWAYS use backend data, even if empty array
           if (data.announcements !== undefined) {
             // Create a set of existing event IDs for quick lookup
             const eventIds = new Set(loadedEvents.map((event: any) => event.id));
@@ -198,50 +199,51 @@ function AppContent() {
               return true;
             });
             
-            // Preserve read status from localStorage if available
-            let finalAnnouncements = cleanedAnnouncements;
+            // Merge with localStorage announcements (for local development)
+            let localAnnouncements: any[] = [];
             if (savedAnnouncements) {
               try {
-                const savedAnnouncementsList = JSON.parse(savedAnnouncements);
-                const savedMap = new Map(savedAnnouncementsList.map((ann: any) => [ann.id, ann]));
-                
-                finalAnnouncements = cleanedAnnouncements.map((newAnn: any) => {
-                  const saved = savedMap.get(newAnn.id) as any;
-                  return {
-                    ...newAnn,
-                    read: saved?.read || false // Preserve read status or default to false
-                  };
-                });
+                localAnnouncements = JSON.parse(savedAnnouncements);
               } catch (e) {
-                console.warn("Failed to parse saved announcements for read status");
-                finalAnnouncements = cleanedAnnouncements.map((ann: any) => ({ ...ann, read: false }));
+                console.warn("Failed to parse saved announcements");
               }
-            } else {
-              finalAnnouncements = cleanedAnnouncements.map((ann: any) => ({ ...ann, read: false }));
             }
+            
+            // Combine API announcements with localStorage announcements
+            const apiIds = new Set(cleanedAnnouncements.map((ann: any) => ann.id));
+            const uniqueLocalAnnouncements = localAnnouncements.filter((ann: any) => !apiIds.has(ann.id));
+            const allAnnouncements = [...cleanedAnnouncements, ...uniqueLocalAnnouncements];
+            
+            // Sort by creation date (newest first)
+            allAnnouncements.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+            
+            // Preserve read status
+            const finalAnnouncements = allAnnouncements.map((ann: any) => ({
+              ...ann,
+              read: ann.read || false
+            }));
             
             setAnnouncements(finalAnnouncements);
             localStorage.setItem("announcements", JSON.stringify(finalAnnouncements));
             
-            console.log(`✅ Synced announcements from backend: ${finalAnnouncements.length} announcements`);
-          } else {
-            // Only use fallback if backend response is malformed
-            console.warn("Backend returned malformed data, using fallback");
-            if (savedAnnouncements) {
-              try {
-                const loadedAnnouncements = JSON.parse(savedAnnouncements);
-                setAnnouncements(loadedAnnouncements);
-              } catch (e) {
-                setAnnouncements([]);
-              }
-            } else {
-              setAnnouncements([]);
-            }
+            console.log(`✅ Loaded announcements: ${finalAnnouncements.length} total (${cleanedAnnouncements.length} from API, ${uniqueLocalAnnouncements.length} from localStorage)`);
+            announcementsLoaded = true;
           }
         } catch (error) {
-          console.error("Failed to fetch announcements from backend:", error);
-          // Clear localStorage on fetch error to prevent stale data
-          localStorage.removeItem("announcements");
+          console.warn("API unavailable, using localStorage announcements:", error);
+        }
+        
+        // Fallback to localStorage if API failed
+        if (!announcementsLoaded && savedAnnouncements) {
+          try {
+            const loadedAnnouncements = JSON.parse(savedAnnouncements);
+            setAnnouncements(loadedAnnouncements);
+            console.log(`📂 Loaded ${loadedAnnouncements.length} announcements from localStorage`);
+          } catch (e) {
+            console.warn("Failed to parse saved announcements");
+            setAnnouncements([]);
+          }
+        } else if (!announcementsLoaded) {
           setAnnouncements([]);
         }
         
@@ -396,88 +398,116 @@ function AppContent() {
     return () => clearInterval(interval);
   }, [isLoggedIn, isAdmin]);
 
-  // Periodic announcement refresh - sync with backend every 30 seconds
+  // Periodic announcement refresh - sync with backend and localStorage every 30 seconds
   useEffect(() => {
     if (!isLoggedIn || isAdmin) return;
 
     const refreshAnnouncements = async () => {
       try {
-        const response = await fetch(
-          `https://${projectId}.supabase.co/functions/v1/make-server-917daa5d/announcements`,
-          {
-            headers: {
-              'Authorization': `Bearer ${publicAnonKey}`
+        let apiAnnouncements: any[] = [];
+        let localAnnouncements: any[] = [];
+        
+        // Try to get announcements from API
+        try {
+          const response = await fetch(
+            `https://${projectId}.supabase.co/functions/v1/make-server-917daa5d/announcements`,
+            {
+              headers: {
+                'Authorization': `Bearer ${publicAnonKey}`
+              }
             }
+          );
+          
+          const data = await response.json();
+          
+          if (data.announcements !== undefined) {
+            // Filter out orphaned event announcements
+            const eventIds = new Set(events.map((event: any) => event.id));
+            apiAnnouncements = data.announcements.filter((announcement: any) => {
+              if (announcement.id && announcement.id.startsWith('event-announcement-')) {
+                const eventId = announcement.id.replace('event-announcement-', '');
+                return eventIds.has(eventId);
+              }
+              return true;
+            });
           }
-        );
+        } catch (apiError) {
+          console.warn('API unavailable during refresh, checking localStorage');
+        }
         
-        const data = await response.json();
+        // Always check localStorage for admin-created announcements
+        try {
+          const storedAnnouncements = localStorage.getItem('announcements');
+          if (storedAnnouncements) {
+            const parsed = JSON.parse(storedAnnouncements);
+            localAnnouncements = Array.isArray(parsed) ? parsed : [];
+          }
+        } catch (e) {
+          console.warn('Failed to parse localStorage announcements during refresh');
+        }
         
-        if (data.announcements !== undefined) {
-          // Filter out orphaned event announcements
-          const eventIds = new Set(events.map((event: any) => event.id));
-          const cleanedAnnouncements = data.announcements.filter((announcement: any) => {
-            if (announcement.id && announcement.id.startsWith('event-announcement-')) {
-              const eventId = announcement.id.replace('event-announcement-', '');
-              return eventIds.has(eventId);
-            }
-            return true;
+        // Combine API and local announcements
+        const apiIds = new Set(apiAnnouncements.map((ann: any) => ann.id));
+        const uniqueLocalAnnouncements = localAnnouncements.filter((ann: any) => !apiIds.has(ann.id));
+        const allAnnouncements = [...apiAnnouncements, ...uniqueLocalAnnouncements];
+        
+        // Sort by creation date (newest first)
+        allAnnouncements.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        
+        // Smart update: preserve read status and only update if there are changes
+        setAnnouncements(prev => {
+          // Create a map of existing announcements by ID to preserve read status
+          const existingMap = new Map(prev.map(ann => [ann.id, ann]));
+          
+          // Merge new data with existing read status
+          const mergedAnnouncements = allAnnouncements.map((newAnn: any) => {
+            const existing = existingMap.get(newAnn.id) as any;
+            return {
+              ...newAnn,
+              read: existing?.read || false // Preserve read status or default to false for new announcements
+            };
           });
           
-          // Smart update: preserve read status and only update if there are new announcements
-          setAnnouncements(prev => {
-            // Create a map of existing announcements by ID to preserve read status
-            const existingMap = new Map(prev.map(ann => [ann.id, ann]));
-            
-            // Merge new data with existing read status
-            const mergedAnnouncements = cleanedAnnouncements.map((newAnn: any) => {
-              const existing = existingMap.get(newAnn.id) as any;
-              return {
-                ...newAnn,
-                read: existing?.read || false // Preserve read status or default to false for new announcements
-              };
-            });
-            
-            // Check if there are actually new announcements (by ID)
-            const existingIds = new Set(prev.map(ann => ann.id));
-            const newIds = new Set(cleanedAnnouncements.map((ann: any) => ann.id));
-            const hasNewAnnouncements = cleanedAnnouncements.some((ann: any) => !existingIds.has(ann.id));
-            const hasRemovedAnnouncements = prev.some(ann => !newIds.has(ann.id));
-            
-            // Only update if there are new announcements, removed announcements, or content changes
-            if (hasNewAnnouncements || hasRemovedAnnouncements) {
-              localStorage.setItem("announcements", JSON.stringify(mergedAnnouncements));
-              if (hasNewAnnouncements) {
-                const newAnnouncementCount = cleanedAnnouncements.filter((ann: any) => !existingIds.has(ann.id)).length;
-                console.log(`� ${newAnnouncementCount} new announcement(s) received`);
-              }
-              if (hasRemovedAnnouncements) {
-                console.log(`🗑️ Some announcements were removed`);
-              }
-              return mergedAnnouncements;
+          // Check if there are actually changes
+          const existingIds = new Set(prev.map(ann => ann.id));
+          const newIds = new Set(allAnnouncements.map((ann: any) => ann.id));
+          const hasNewAnnouncements = allAnnouncements.some((ann: any) => !existingIds.has(ann.id));
+          const hasRemovedAnnouncements = prev.some(ann => !newIds.has(ann.id));
+          
+          // Only update if there are changes
+          if (hasNewAnnouncements || hasRemovedAnnouncements || mergedAnnouncements.length !== prev.length) {
+            localStorage.setItem("announcements", JSON.stringify(mergedAnnouncements));
+            if (hasNewAnnouncements) {
+              const newAnnouncementCount = allAnnouncements.filter((ann: any) => !existingIds.has(ann.id)).length;
+              console.log(`🔔 ${newAnnouncementCount} new announcement(s) received`);
             }
-            
-            // Check for content changes in existing announcements
-            const hasContentChanges = prev.some(existingAnn => {
-              const newAnn = cleanedAnnouncements.find((ann: any) => ann.id === existingAnn.id);
-              return newAnn && (
-                newAnn.title !== existingAnn.title ||
-                newAnn.content !== existingAnn.content ||
-                newAnn.priority !== existingAnn.priority ||
-                newAnn.category !== existingAnn.category
-              );
-            });
-            
-            if (hasContentChanges) {
-              localStorage.setItem("announcements", JSON.stringify(mergedAnnouncements));
-              console.log(`📝 Announcement content updated`);
-              return mergedAnnouncements;
+            if (hasRemovedAnnouncements) {
+              console.log(`🗑️ Some announcements were removed`);
             }
-            
-            // No changes detected, return previous state
-            return prev;
+            return mergedAnnouncements;
+          }
+          
+          // Check for content changes in existing announcements
+          const hasContentChanges = prev.some(existingAnn => {
+            const newAnn = allAnnouncements.find((ann: any) => ann.id === existingAnn.id);
+            return newAnn && (
+              newAnn.title !== existingAnn.title ||
+              newAnn.content !== existingAnn.content ||
+              newAnn.priority !== existingAnn.priority ||
+              newAnn.category !== existingAnn.category
+            );
           });
-        }
+          
+          if (hasContentChanges) {
+            localStorage.setItem("announcements", JSON.stringify(mergedAnnouncements));
+            console.log(`📝 Announcement content updated`);
+            return mergedAnnouncements;
+          }
+          
+          // No changes detected, return previous state
+          return prev;
+        });
+        
       } catch (error) {
         console.warn("Failed to refresh announcements:", error);
       }
@@ -1178,7 +1208,7 @@ function AppContent() {
             )}
 
             {activeTab === "settings" && (
-              <MainContentAccessibilitySettings />
+              <div className="p-6"><h2 className="text-2xl font-bold mb-4">Settings</h2><p>Settings page will be implemented here.</p></div>
             )}
 
             {!["dashboard", "courses", "notes", "calendar", "library", "settings"].includes(activeTab) && (

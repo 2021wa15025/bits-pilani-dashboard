@@ -232,18 +232,36 @@ export function AdminDashboard({ onLogout, adminUsername }: AdminDashboardProps)
 
   const fetchAnnouncements = async () => {
     try {
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-917daa5d/announcements`,
-        {
-          headers: { 'Authorization': `Bearer ${publicAnonKey}` }
+      // Try API first, fallback to localStorage for local development
+      try {
+        const response = await fetch(
+          `https://${projectId}.supabase.co/functions/v1/make-server-917daa5d/announcements`,
+          {
+            headers: { 'Authorization': `Bearer ${publicAnonKey}` }
+          }
+        );
+        const data = await response.json();
+        if (data.announcements) {
+          setAnnouncements(data.announcements);
+          return;
         }
-      );
-      const data = await response.json();
-      if (data.announcements) {
-        setAnnouncements(data.announcements);
+      } catch (apiError) {
+        console.warn('API unavailable, using localStorage:', apiError);
+      }
+      
+      // Fallback to localStorage for local development
+      const storedAnnouncements = localStorage.getItem('announcements');
+      if (storedAnnouncements) {
+        const parsedAnnouncements = JSON.parse(storedAnnouncements);
+        setAnnouncements(parsedAnnouncements);
+      } else {
+        // Initialize with empty array if no announcements exist
+        setAnnouncements([]);
       }
     } catch (error) {
       console.error('Error fetching announcements:', error);
+      // Set empty array as fallback
+      setAnnouncements([]);
     }
   };
 
@@ -334,30 +352,69 @@ export function AdminDashboard({ onLogout, adminUsername }: AdminDashboardProps)
 
   // Announcement handlers
   const handleCreateAnnouncement = async () => {
-    if (!formData.title || !formData.content) return;
+    if (!formData.title || !formData.content) {
+      alert('Please fill in all required fields (Title and Content)');
+      return;
+    }
+    
+    console.log('Creating announcement with data:', formData);
     
     setIsLoading(true);
     try {
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-917daa5d/announcements`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${publicAnonKey}`
-          },
-          body: JSON.stringify({ ...formData, createdBy: adminUsername })
-        }
-      );
+      // Try API first, fallback to localStorage for local development
+      try {
+        const response = await fetch(
+          `https://${projectId}.supabase.co/functions/v1/make-server-917daa5d/announcements`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${publicAnonKey}`
+            },
+            body: JSON.stringify({ ...formData, createdBy: adminUsername })
+          }
+        );
 
-      const data = await response.json();
-      if (data.success) {
-        await fetchAnnouncements();
-        setIsCreateDialogOpen(false);
-        setFormData({ title: "", content: "", category: "", priority: "" });
+        const data = await response.json();
+        if (data.success) {
+          await fetchAnnouncements();
+          setIsCreateDialogOpen(false);
+          setFormData({ title: "", content: "", category: "", priority: "" });
+          alert('Announcement created successfully!');
+          return;
+        }
+      } catch (apiError) {
+        console.warn('API unavailable, using localStorage:', apiError);
       }
+      
+      // Fallback to localStorage for local development
+      const newAnnouncement: Announcement = {
+        id: `announcement-${Date.now()}`,
+        title: formData.title,
+        content: formData.content,
+        category: formData.category || 'General',
+        priority: (formData.priority as 'high' | 'medium' | 'low') || 'medium',
+        createdAt: new Date().toISOString(),
+        createdBy: adminUsername,
+        time: new Date().toLocaleTimeString()
+      };
+      
+      // Save to localStorage
+      const existingAnnouncements = JSON.parse(localStorage.getItem('announcements') || '[]');
+      const updatedAnnouncements = [newAnnouncement, ...existingAnnouncements];
+      localStorage.setItem('announcements', JSON.stringify(updatedAnnouncements));
+      
+      // Update state
+      setAnnouncements(updatedAnnouncements);
+      
+      // Close dialog and reset form
+      setIsCreateDialogOpen(false);
+      setFormData({ title: "", content: "", category: "", priority: "" });
+      alert('Announcement created successfully!');
+      
     } catch (error) {
       console.error('Error creating announcement:', error);
+      alert('Failed to create announcement. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -367,19 +424,33 @@ export function AdminDashboard({ onLogout, adminUsername }: AdminDashboardProps)
     if (!confirm('Are you sure you want to delete this announcement?')) return;
     
     try {
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-917daa5d/announcements/${id}`,
-        {
-          method: 'DELETE',
-          headers: { 'Authorization': `Bearer ${publicAnonKey}` }
-        }
-      );
+      // Try API first, fallback to localStorage for local development
+      try {
+        const response = await fetch(
+          `https://${projectId}.supabase.co/functions/v1/make-server-917daa5d/announcements/${id}`,
+          {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${publicAnonKey}` }
+          }
+        );
 
-      if (response.ok) {
-        await fetchAnnouncements();
+        if (response.ok) {
+          await fetchAnnouncements();
+          return;
+        }
+      } catch (apiError) {
+        console.warn('API unavailable, using localStorage:', apiError);
       }
+      
+      // Fallback to localStorage for local development
+      const existingAnnouncements = JSON.parse(localStorage.getItem('announcements') || '[]');
+      const updatedAnnouncements = existingAnnouncements.filter((ann: Announcement) => ann.id !== id);
+      localStorage.setItem('announcements', JSON.stringify(updatedAnnouncements));
+      setAnnouncements(updatedAnnouncements);
+      
     } catch (error) {
       console.error('Error deleting announcement:', error);
+      alert('Failed to delete announcement. Please try again.');
     }
   };
 
