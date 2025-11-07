@@ -1,0 +1,301 @@
+/* Accessibility Settings CSS - Applied to .university-content */
+
+/* Profile-based styles */
+.university-content.visual-impairment {
+  filter: none;
+}
+
+.university-content.seizure-epileptic {
+  animation: none !important;
+}
+
+.university-content.color-vision-deficiency {
+  filter: none;
+}
+
+.university-content.adhd {
+  animation: none !important;
+}
+
+.university-content.dyslexia {
+  font-family: 'OpenDyslexic', 'Comic Sans MS', sans-serif;
+}
+
+.university-content.learning {
+  line-height: 1.8;
+}
+
+/* Text adjustments */
+.university-content.accessibility-text-large {
+  font-size: 115% !important;
+}
+
+.university-content.accessibility-text-large * {
+  font-size: inherit !important;
+}
+
+.university-content.accessibility-text-xlarge {
+  font-size: 130% !important;
+}
+
+.university-content.accessibility-text-xlarge * {
+  font-size: inherit !important;
+}
+
+.university-content.accessibility-line-height {
+  line-height: 1.8 !important;
+}
+
+.university-content.accessibility-line-height * {
+  line-height: inherit !important;
+}
+
+.university-content.accessibility-letter-spacing {
+  letter-spacing: 0.1em !important;
+}
+
+.university-content.accessibility-letter-spacing * {
+  letter-spacing: inherit !important;
+}
+
+/* Font adjustments */
+.university-content.main-readable-font {
+  font-family: 'Georgia', 'Times New Roman', serif !important;
+}
+
+.university-content.main-readable-font * {
+  font-family: inherit !important;
+}
+
+.university-content.main-dyslexia-font {
+  font-family: 'OpenDyslexic', 'Comic Sans MS', cursive !important;
+}
+
+.university-content.main-dyslexia-font * {
+  font-family: inherit !important;
+}
+
+/* Content highlighting */
+.university-content.main-highlight-headings h1,
+.university-content.main-highlight-headings h2,
+.university-content.main-highlight-headings h3,
+.university-content.main-highlight-headings h4,
+.university-content.main-highlight-headings h5,
+.university-content.main-highlight-headings h6 {
+  background-color: #fff3cd !important;
+  border-left: 4px solid #ffc107 !important;
+  padding: 8px 12px !important;
+  margin: 8px 0 !important;
+  border-radius: 4px !important;
+}
+
+.university-content.main-highlight-links a {
+  background-color: #d1ecf1 !important;
+  border: 2px solid #0dcaf0 !important;
+  padding: 2px 6px !important;
+  border-radius: 4px !important;
+  text-decoration: underline !important;
+  font-weight: bold !important;
+}
+
+.university-content.main-highlight-buttons button,
+.university-content.main-highlight-buttons .btn,
+.university-content.main-highlight-buttons [role="button"] {
+  border: 3px solid #dc3545 !important;
+  box-shadow: 0 0 0 2px #fff, 0 0 0 4px #dc3545 !important;
+  font-weight: bold !important;
+}
+
+/* Content modifications */
+.university-content.main-hide-images img {
+  display: none !important;
+}
+
+.university-content.main-show-tooltips [title]:hover::after {
+  content: attr(title);
+  position: absolute;
+  background: #333;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+  z-index: 1000;
+  top: 100%;
+  left: 0;
+}
+
+.university-content.main-stop-animations *,
+.university-content.main-stop-animations *::before,
+.university-content.main-stop-animations *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* Contrast and color adjustments */
+.university-content.main-dark-contrast {
+  background-color: #000 !important;
+  color: #fff !important;
+}
+
+.university-content.main-dark-contrast * {
+  background-color: inherit !important;
+  color: inherit !important;
+  border-color: #fff !important;
+}
+
+.university-content.main-light-contrast {
+  background-color: #fff !important;
+  color: #000 !important;
+}
+
+.university-content.main-light-contrast * {
+  background-color: inherit !important;
+  color: inherit !important;
+  border-color: #000 !important;
+}
+
+.university-content.main-high-contrast {
+  filter: contrast(200%) !important;
+}
+
+.university-content.main-high-saturation {
+  filter: saturate(200%) !important;
+}
+
+.university-content.main-low-saturation {
+  filter: saturate(50%) !important;
+}
+
+.university-content.main-monochrome {
+  filter: grayscale(100%) !important;
+}
+
+.university-content.main-invert-colors {
+  filter: invert(1) hue-rotate(180deg) !important;
+}
+
+/* Cursor modifications */
+.university-content.main-big-black-cursor,
+.university-content.main-big-black-cursor * {
+  cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><path d="M2,2 L10,18 L6,18 L8,22 L12,22 L10,18 L18,16 Z" fill="black"/></svg>') 2 2, auto !important;
+}
+
+.university-content.main-big-white-cursor,
+.university-content.main-big-white-cursor * {
+  cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><path d="M2,2 L10,18 L6,18 L8,22 L12,22 L10,18 L18,16 Z" fill="white" stroke="black" stroke-width="1"/></svg>') 2 2, auto !important;
+}
+
+/* Reading assistance */
+.university-content.main-reading-guide {
+  position: relative;
+}
+
+.university-content.main-reading-guide::before {
+  content: '';
+  position: fixed;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: #ff6b6b;
+  z-index: 9999;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.university-content.main-reading-mask {
+  position: relative;
+  overflow: hidden;
+}
+
+.university-content.main-reading-mask::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(0,0,0,0.8) 0%,
+    rgba(0,0,0,0.8) 45%,
+    transparent 50%,
+    transparent 50%,
+    rgba(0,0,0,0.8) 55%,
+    rgba(0,0,0,0.8) 100%
+  );
+  z-index: 9998;
+  pointer-events: none;
+}
+
+/* Dark theme compatibility */
+.dark .university-content.main-light-contrast {
+  background-color: #000 !important;
+  color: #fff !important;
+}
+
+.dark .university-content.main-light-contrast * {
+  background-color: inherit !important;
+  color: inherit !important;
+  border-color: #fff !important;
+}
+
+.dark .university-content.main-highlight-headings h1,
+.dark .university-content.main-highlight-headings h2,
+.dark .university-content.main-highlight-headings h3,
+.dark .university-content.main-highlight-headings h4,
+.dark .university-content.main-highlight-headings h5,
+.dark .university-content.main-highlight-headings h6 {
+  background-color: #4a4a00 !important;
+  border-left-color: #ffeb3b !important;
+}
+
+.dark .university-content.main-highlight-links a {
+  background-color: #1a4a52 !important;
+  border-color: #26c6da !important;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .university-content.accessibility-text-large {
+    font-size: 110% !important;
+  }
+  
+  .university-content.accessibility-text-xlarge {
+    font-size: 125% !important;
+  }
+  
+  .university-content.main-highlight-headings h1,
+  .university-content.main-highlight-headings h2,
+  .university-content.main-highlight-headings h3,
+  .university-content.main-highlight-headings h4,
+  .university-content.main-highlight-headings h5,
+  .university-content.main-highlight-headings h6 {
+    padding: 6px 8px !important;
+    margin: 6px 0 !important;
+  }
+}
+
+/* Focus indicators for keyboard navigation */
+.university-content *:focus {
+  outline: 3px solid #0066cc !important;
+  outline-offset: 2px !important;
+}
+
+/* Print styles */
+@media print {
+  .university-content.main-stop-animations *,
+  .university-content.main-stop-animations *::before,
+  .university-content.main-stop-animations *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  
+  .university-content.main-high-contrast {
+    filter: none !important;
+    -webkit-filter: none !important;
+  }
+}
