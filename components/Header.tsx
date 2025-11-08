@@ -660,6 +660,12 @@ export function Header({
         <MessagingModal
           isOpen={isMessagingOpen}
           onClose={() => setIsMessagingOpen(false)}
+          currentUser={{
+            id: userProfile.id,
+            name: userProfile.name,
+            email: userProfile.email,
+            avatar: userProfile.avatar
+          }}
         />
       )}
     </header>
