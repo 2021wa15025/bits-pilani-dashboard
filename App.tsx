@@ -1214,8 +1214,11 @@ function AppContent() {
               <SettingsPage
                 userProfile={userProfile}
                 theme={theme}
-                onThemeToggle={toggleTheme}
-                onProfileUpdate={handleProfileUpdate}
+                onThemeToggle={handleThemeToggle}
+                onProfileUpdate={(updatedProfile: any) => {
+                  setUserProfile(updatedProfile);
+                  localStorage.setItem("userProfile", JSON.stringify(updatedProfile));
+                }}
               />
             )}
 
