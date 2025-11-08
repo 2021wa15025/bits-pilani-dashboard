@@ -645,31 +645,426 @@ html, body {
 
 /* Fix dropdown visibility and readability */
 [data-radix-select-content] {
-  background-color: white !important;
-  border: 2px solid #d1d5db !important;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
-  z-index: 999999 !important;
+  background-color: #ffffff !important;
+  border: 1px solid #e5e7eb !important;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+  z-index: 50 !important;
+  color: #1f2937 !important;
 }
 
 .dark [data-radix-select-content] {
-  background-color: #1e293b !important;
-  border: 2px solid #64748b !important;
-  color: white !important;
+  background-color: #1f2937 !important;
+  border: 1px solid #4b5563 !important;
+  color: #ffffff !important;
 }
 
 [data-radix-select-item] {
   padding: 8px 12px !important;
   transition: background-color 0.15s ease !important;
+  color: #1f2937 !important;
+  background-color: transparent !important;
 }
 
 [data-radix-select-item]:hover,
 [data-radix-select-item][data-highlighted] {
   background-color: #f3f4f6 !important;
-  color: #111827 !important;
+  color: #1f2937 !important;
 }
 
 .dark [data-radix-select-item]:hover,
 .dark [data-radix-select-item][data-highlighted] {
   background-color: #374151 !important;
+  color: #ffffff !important;
+}
+
+/* Force solid background for dropdown menus */
+[data-slot="dropdown-menu-content"] {
+  background-color: #ffffff !important;
+  backdrop-filter: none !important;
+  border: 1px solid #e2e8f0 !important;
+}
+
+.dark [data-slot="dropdown-menu-content"] {
+  background-color: #1e293b !important;
+  border: 1px solid #475569 !important;
+}
+
+[data-slot="dropdown-menu-item"] {
+  color: #1a202c !important;
+  background-color: transparent !important;
+}
+
+[data-slot="dropdown-menu-item"]:hover,
+[data-slot="dropdown-menu-item"][data-highlighted] {
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
+}
+
+.dark [data-slot="dropdown-menu-item"] {
+  color: #f1f5f9 !important;
+}
+
+.dark [data-slot="dropdown-menu-item"]:hover,
+.dark [data-slot="dropdown-menu-item"][data-highlighted] {
+  background-color: #334155 !important;
+  color: #ffffff !important;
+}
+
+/* Force select dropdown content visibility - Ultimate fix */
+[data-slot="select-content"] {
+  background-color: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  color: #1a202c !important;
+  z-index: 99999 !important;
+  display: block !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  visibility: visible !important;
+  position: fixed !important;
+  min-width: 280px !important;
+  max-height: 400px !important;
+  overflow-y: auto !important;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+  border-radius: 6px !important;
+  padding: 4px !important;
+}
+
+/* Show all Radix select content */
+[data-radix-select-content] {
+  background-color: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  color: #1a202c !important;
+  z-index: 99999 !important;
+  display: block !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  visibility: visible !important;
+  position: fixed !important;
+  min-width: 280px !important;
+  max-height: 400px !important;
+  overflow-y: auto !important;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+  border-radius: 6px !important;
+  padding: 4px !important;
+}
+
+/* Ensure viewport shows all content */
+[data-radix-select-viewport] {
+  max-height: 380px !important;
+  overflow-y: auto !important;
+  padding: 0 !important;
+}
+
+/* Force show when state is open */
+[data-state="open"][data-slot="select-content"],
+[aria-expanded="true"] + [data-slot="select-content"] {
+  display: block !important;
+  opacity: 1 !important;
+  transform: scale(1) !important;
+  visibility: visible !important;
+}
+
+/* Force show Radix Portal content */
+[data-radix-portal] {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  z-index: 99999 !important;
+  pointer-events: none !important;
+}
+
+[data-radix-portal] > * {
+  pointer-events: auto !important;
+}
+
+.dark [data-slot="select-content"],
+.dark [data-radix-select-content] {
+  background-color: #1e293b !important;
+  border: 1px solid #475569 !important;
+  color: #f1f5f9 !important;
+}
+
+/* Ensure select trigger is clickable and shows interaction */
+[data-slot="select-trigger"] {
+  cursor: pointer !important;
+  pointer-events: auto !important;
+  background-color: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+}
+
+[data-slot="select-trigger"]:hover {
+  background-color: #f9fafb !important;
+  border-color: #d1d5db !important;
+}
+
+[data-slot="select-trigger"]:focus,
+[data-slot="select-trigger"]:active {
+  outline: none !important;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5) !important;
+  border-color: #3b82f6 !important;
+}
+
+/* Enhanced select items for better visibility */
+[data-slot="select-item"] {
+  color: #1a202c !important;
+  background-color: transparent !important;
+  padding: 10px 12px !important;
+  cursor: pointer !important;
+  display: block !important;
+  width: 100% !important;
+  border-radius: 4px !important;
+  margin: 1px 0 !important;
+  font-size: 0.875rem !important;
+  line-height: 1.25rem !important;
+}
+
+[data-slot="select-item"]:hover,
+[data-slot="select-item"][data-highlighted] {
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
+}
+
+.dark [data-slot="select-item"] {
+  color: #f1f5f9 !important;
+}
+
+.dark [data-slot="select-item"]:hover,
+.dark [data-slot="select-item"][data-highlighted] {
+  background-color: #334155 !important;
+  color: #ffffff !important;
+}
+
+/* Dialog and Modal z-index fixes */
+[data-slot="dialog-overlay"],
+[data-radix-dialog-overlay] {
+  z-index: 99998 !important;
+  position: fixed !important;
+}
+
+[data-slot="dialog-content"],
+[data-radix-dialog-content] {
+  z-index: 99999 !important;
+  position: fixed !important;
+}
+
+/* Ensure dialog portals appear above everything */
+.dialog-portal,
+[data-radix-portal],
+[data-slot="dialog-portal"] {
+  z-index: 99999 !important;
+}
+
+/* Force dialog positioning */
+[role="dialog"] {
+  z-index: 99999 !important;
+  position: fixed !important;
+}
+
+/* Radix UI Dialog specific overrides */
+[data-radix-dialog-overlay] {
+  z-index: 99998 !important;
+  position: fixed !important;
+  inset: 0 !important;
+}
+
+[data-radix-dialog-content] {
+  z-index: 99999 !important;
+  position: fixed !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+}
+
+/* Extra specific overrides for dialog visibility */
+div[data-radix-portal] {
+  z-index: 99999 !important;
+}
+
+div[data-radix-portal] > div {
+  z-index: 99999 !important;
+}
+
+/* Override any potential header interference */
+.university-header ~ * [data-radix-dialog-content],
+.university-header ~ * [data-slot="dialog-content"] {
+  z-index: 99999 !important;
+  position: fixed !important;
+}
+
+/* Ensure dialog portals bypass container overflow restrictions */
+body > div[data-radix-portal],
+body > div[data-slot="dialog-portal"] {
+  z-index: 99999 !important;
+  position: fixed !important;
+  inset: 0 !important;
+  pointer-events: none !important;
+}
+
+body > div[data-radix-portal] > *,
+body > div[data-slot="dialog-portal"] > * {
+  pointer-events: auto !important;
+}
+
+/* Ensure root elements don't restrict dialog positioning */
+#root {
+  position: relative !important;
+}
+
+html, body {
+  overflow-x: auto !important;
+}
+
+/* Force dialog elements to appear above everything */
+[data-state="open"][data-radix-dialog-overlay] {
+  z-index: 99998 !important;
+  position: fixed !important;
+  inset: 0 !important;
+}
+
+[data-state="open"][data-radix-dialog-content] {
+  z-index: 99999 !important;
+  position: fixed !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+}
+
+/* Sticky header buttons z-index fix */
+.sticky.top-0.z-50 {
+  z-index: 45 !important;
+}
+
+.sticky.top-0.z-50 button {
+  z-index: 46 !important;
+  position: relative !important;
+}
+
+/* Ensure note edit/detail page headers stay above content and below main header */
+.bg-card.sticky {
+  z-index: 45 !important;
+  backdrop-filter: blur(12px) !important;
+  background-color: hsl(var(--card) / 0.98) !important;
+  border-bottom: 1px solid hsl(var(--border)) !important;
+}
+
+/* Alternative approach - use margin-top on university-content for note pages */
+.university-content {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
+/* Clean sticky header styling for note pages */
+.note-edit-page .sticky.top-0,
+.note-detail-page .sticky.top-0,
+.sticky.top-0.z-50 {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 45 !important;
+  background-color: hsl(var(--card)) !important;
+  backdrop-filter: blur(12px) !important;
+  border-bottom: 1px solid hsl(var(--border)) !important;
+}
+
+.sticky.top-0.z-50 button {
+  z-index: 46 !important;
+  position: relative !important;
+}
+
+/* Button styling fixes to ensure proper colors */
+button[class*="bg-primary"] {
+  background-color: #191f5e !important;
   color: white !important;
+}
+
+button[class*="bg-primary"]:hover {
+  background-color: #151a4a !important;
+  color: white !important;
+}
+
+button[class*="bg-[#191f5e]"] {
+  background-color: #191f5e !important;
+  color: white !important;
+}
+
+button[class*="bg-[#191f5e]"]:hover {
+  background-color: #151a4a !important;
+  color: white !important;
+}
+
+/* Ensure outline buttons have proper contrast */
+button[data-slot="button"][class*="variant-outline"] {
+  border-color: hsl(var(--border)) !important;
+  background-color: hsl(var(--background)) !important;
+  color: hsl(var(--foreground)) !important;
+}
+
+button[data-slot="button"][class*="variant-outline"]:hover {
+  background-color: hsl(var(--accent)) !important;
+  color: hsl(var(--accent-foreground)) !important;
+}
+
+/* Fix disabled button states */
+button:disabled {
+  opacity: 0.5 !important;
+  cursor: not-allowed !important;
+}
+
+/* Fixed header styling for note pages */
+.fixed.top-20.z-50 {
+  position: fixed !important;
+  top: 80px !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 50 !important;
+  background-color: #ffffff !important;
+  border-bottom: 1px solid hsl(var(--border)) !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+}
+
+.fixed.top-20.z-50 button {
+  z-index: 51 !important;
+  position: relative !important;
+}
+
+/* File manager dialog fixes */
+[data-slot="dialog-content"].z-\[9999\] {
+  z-index: 99999 !important;
+  position: fixed !important;
+}
+
+/* Image loading fixes */
+.image-fallback {
+  background-color: hsl(var(--muted)) !important;
+}
+
+/* Ensure dialog close button is always visible */
+[data-slot="dialog-content"] button[data-radix-collection-item] {
+  background: white !important;
+  border: 1px solid #e5e7eb !important;
+  z-index: 100000 !important;
+}
+
+/* Fix for dialog image preview overlap with close button */
+[data-slot="dialog-content"] img {
+  max-width: calc(100% - 60px) !important;
+  margin-right: 60px !important;
+}
+
+[data-slot="dialog-content"] .image-preview-container {
+  padding-right: 60px !important;
+  max-width: calc(100% - 60px) !important;
+}
+
+/* Ensure close button in dialog stays on top with proper styling */
+[data-slot="dialog-content"] button:has(.sr-only) {
+  position: absolute !important;
+  top: 8px !important;
+  right: 8px !important;
+  z-index: 100001 !important;
+  background: white !important;
+  border-radius: 50% !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+  border: 2px solid #e5e7eb !important;
+  width: 32px !important;
+  height: 32px !important;
 }

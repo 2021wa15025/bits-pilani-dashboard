@@ -14,6 +14,7 @@ import { AnnouncementsWidget } from "./components/widgets/AnnouncementsWidget";
 import { ProfileEditDialog } from "./components/ProfileEditDialog";
 import { AnnouncementsDialog } from "./components/AnnouncementsDialog";
 import { SchedulePopup } from "./components/SchedulePopup";
+import { SettingsPage } from "./components/SettingsPage";
 import { Button } from "./components/ui/button";
 import { cn } from "./components/ui/utils";
 import { Toaster } from "./components/ui/sonner";
@@ -32,14 +33,12 @@ const NoteDetailPage = lazy(() => import("./components/NoteDetailPage"));
 const NoteEditPage = lazy(() => import("./components/NoteEditPage"));
 const UniversityInfoPage = lazy(() => import("./components/UniversityInfoPage"));
 
-// Import SettingsPage
-import { SettingsPage } from "./components/SettingsPage";
-
 // Import data from separate files
 import { coursesData } from "./data/coursesData.ts";
 import { eventsData } from "./data/eventsData.ts";
 import { sampleNotes, getAnnouncementsData } from "./data/sampleData.ts";
 import { projectId, publicAnonKey } from './utils/supabase/info';
+import { supabaseDatabase, type UserProfile } from './utils/supabase/database';
 
 import "./utils/errorHandler";
 
@@ -53,7 +52,8 @@ function AppContent() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [showAdminLogin, setShowAdminLogin] = useState(false);
   const [userName, setUserName] = useState("");
-  const [userProfile, setUserProfile] = useState<any>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [currentStudentId, setCurrentStudentId] = useState<string>("");
   
   // UI state
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -91,25 +91,115 @@ function AppContent() {
   useEffect(() => {
     const initializeApp = async () => {
       try {
-        // Load from localStorage
+        // Load basic session data from localStorage
         const savedLogin = localStorage.getItem("isLoggedIn");
         const savedIsAdmin = localStorage.getItem("isAdmin");
         const savedUserName = localStorage.getItem("userName");
+        const savedStudentId = localStorage.getItem("currentStudentId");
         const savedTheme = localStorage.getItem("theme");
-        const savedActivity = localStorage.getItem("recentActivity");
-        const savedProfile = localStorage.getItem("userProfile");
-        const savedNotes = localStorage.getItem("notes");
-        const savedEvents = localStorage.getItem("events");
-        const savedNotifications = localStorage.getItem("notifications");
-        const savedAnnouncements = localStorage.getItem("announcements");
         const savedLastLoginTime = localStorage.getItem("lastLoginTime");
         
         if (savedLogin === "true") setIsLoggedIn(true);
         if (savedIsAdmin === "true") setIsAdmin(true);
         if (savedUserName) setUserName(savedUserName);
+        if (savedStudentId) setCurrentStudentId(savedStudentId);
         if (savedTheme) setTheme(savedTheme as "light" | "dark");
         if (savedLastLoginTime) setLastLoginTime(savedLastLoginTime);
         
+        // If user is logged in, load their data from Supabase
+        if (savedLogin === "true" && savedStudentId) {
+          try {
+            console.log('Loading user data from Supabase for student:', savedStudentId);
+            
+            // Load user profile from Supabase
+            const profile = await supabaseDatabase.getUserProfile(savedStudentId);
+            if (profile) {
+              setUserProfile(profile);
+              console.log('User profile loaded from Supabase');
+            }
+            
+            // Load user notes from Supabase
+            const userNotes = await supabaseDatabase.getUserNotes(savedStudentId);
+            if (userNotes.length > 0) {
+              // Convert Supabase notes to app format
+              const formattedNotes = userNotes.map(note => ({
+                id: note.id,
+                title: note.title,
+                content: note.content,
+                course: note.course || '',
+                category: 'Study Notes', // Default category
+                date: note.created_at?.split('T')[0] || new Date().toISOString().split('T')[0],
+                tags: note.tags || '',
+                createdAt: note.created_at || new Date().toISOString(),
+                lastModified: note.updated_at || new Date().toISOString(),
+                favorite: note.favorite || false,
+                attachments: [] // Default empty attachments array
+              }));
+              setNotes(formattedNotes);
+              console.log(`Loaded ${userNotes.length} notes from Supabase`);
+            }
+            
+            // Load user events from Supabase
+            const userEvents = await supabaseDatabase.getUserEvents(savedStudentId);
+            if (userEvents.length > 0) {
+              // Convert Supabase events to app format
+              const formattedEvents = userEvents.map(event => ({
+                id: event.id,
+                title: event.title,
+                date: event.date,
+                time: event.time,
+                type: (event.type as "deadline" | "assignment" | "presentation" | "meeting" | "class" | "exam" | "holiday" | "viva" | "lab_assessment") || "class",
+                description: event.description || '',
+                course: event.course || '',
+                location: event.location || ''
+              }));
+              setEvents([...eventsData, ...formattedEvents] as typeof eventsData); // Merge with default events
+              console.log(`Loaded ${userEvents.length} events from Supabase`);
+            } else {
+              setEvents(eventsData); // Use default events if no user events
+            }
+            
+          } catch (error) {
+            console.error('Error loading user data from Supabase:', error);
+            // Fall back to localStorage if Supabase fails
+            const savedProfile = localStorage.getItem("userProfile");
+            const savedNotes = localStorage.getItem("notes");
+            const savedEvents = localStorage.getItem("events");
+            
+            if (savedProfile) {
+              try {
+                setUserProfile(JSON.parse(savedProfile));
+              } catch (e) {
+                console.warn("Failed to parse saved profile");
+              }
+            }
+            
+            if (savedNotes) {
+              try {
+                setNotes(JSON.parse(savedNotes));
+              } catch (e) {
+                console.warn("Failed to parse saved notes");
+              }
+            }
+            
+            if (savedEvents) {
+              try {
+                setEvents(JSON.parse(savedEvents));
+              } catch (e) {
+                setEvents(eventsData);
+              }
+            } else {
+              setEvents(eventsData);
+            }
+          }
+        } else {
+          // If not logged in, use default data
+          setEvents(eventsData);
+          setNotes(sampleNotes);
+        }
+        
+        // Load recent activity from localStorage (kept local for performance)
+        const savedActivity = localStorage.getItem("recentActivity");
         if (savedActivity) {
           try {
             setRecentActivity(JSON.parse(savedActivity));
@@ -118,24 +208,8 @@ function AppContent() {
           }
         }
         
-        if (savedNotes) {
-          try {
-            setNotes(JSON.parse(savedNotes));
-          } catch (e) {
-            console.warn("Failed to parse notes");
-          }
-        }
-        
-        let loadedEvents = eventsData;
-        if (savedEvents) {
-          try {
-            loadedEvents = JSON.parse(savedEvents);
-            setEvents(loadedEvents);
-          } catch (e) {
-            console.warn("Failed to parse events");
-          }
-        }
-        
+        // Load notifications from localStorage
+        const savedNotifications = localStorage.getItem("notifications");
         if (savedNotifications) {
           try {
             setNotifications(JSON.parse(savedNotifications));
@@ -174,6 +248,7 @@ function AppContent() {
 
         // Fetch announcements - try API first, then use localStorage for local development
         let announcementsLoaded = false;
+        const savedAnnouncements = localStorage.getItem("announcements");
         
         try {
           const response = await fetch(
@@ -189,7 +264,7 @@ function AppContent() {
           
           if (data.announcements !== undefined) {
             // Create a set of existing event IDs for quick lookup
-            const eventIds = new Set(loadedEvents.map((event: any) => event.id));
+            const eventIds = new Set(events.map((event: any) => event.id));
             
             // Filter out orphaned event announcements
             const cleanedAnnouncements = data.announcements.filter((announcement: any) => {
@@ -250,68 +325,44 @@ function AppContent() {
           setAnnouncements([]);
         }
         
-        // Re-authenticate student on refresh if logged in
-        if (savedLogin === "true" && savedUserName && !savedIsAdmin) {
-          // Try to re-fetch student profile from backend
+        // Load user profile from localStorage on refresh
+        const savedProfile = localStorage.getItem("userProfile");
+        if (savedLogin === "true" && savedUserName) {
           if (savedProfile) {
             try {
               const parsedProfile = JSON.parse(savedProfile);
-              
-              // Verify this profile is still valid by checking backend
-              try {
-                const response = await fetch(
-                  `https://${projectId}.supabase.co/functions/v1/make-server-917daa5d/student/login`,
-                  {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json',
-                      'Authorization': `Bearer ${publicAnonKey}`
-                    },
-                    body: JSON.stringify({ 
-                      username: parsedProfile.email,
-                      password: 'student123' // Default password for verification
-                    })
-                  }
-                );
-
-                const data = await response.json();
-                
-                if (data.success && data.student) {
-                  // Merge backend data with locally updated fields (like avatar)
-                  const profile = {
-                    name: data.student.name,
-                    id: data.student.id,
-                    email: data.student.email,
-                    phone: data.student.phone,
-                    course: data.student.course,
-                    semester: data.student.semester,
-                    avatar: parsedProfile.avatar || data.student.avatar || defaultProfilePicture, // Preserve local avatar
-                    campus: parsedProfile.campus || data.student.campus || 'BITS Pilani',
-                    academicYear: parsedProfile.academicYear || data.student.academicYear || '2024-25'
-                  };
-                  setUserProfile(profile);
-                  setUserName(profile.name);
-                  localStorage.setItem("userProfile", JSON.stringify(profile));
-                  localStorage.setItem("userName", profile.name);
-                  console.log(`Refreshed profile for: ${profile.name}`);
-                } else {
-                  // Use cached profile if backend fails
-                  setUserProfile(parsedProfile);
-                  setUserName(parsedProfile.name);
-                }
-              } catch (error) {
-                console.warn("Failed to refresh student profile from backend, using cached");
-                setUserProfile(parsedProfile);
-                setUserName(parsedProfile.name);
-              }
+              setUserProfile(parsedProfile);
+              setUserName(parsedProfile.name || savedUserName);
+              console.log(`Restored session for: ${parsedProfile.name || savedUserName}`);
             } catch (e) {
-              console.warn("Failed to parse user profile");
-              // Logout if profile is corrupted
-              setIsLoggedIn(false);
-              localStorage.removeItem("isLoggedIn");
-              localStorage.removeItem("userProfile");
-              localStorage.removeItem("userName");
+              console.warn("Failed to parse user profile, creating basic profile");
+              const basicProfile: UserProfile = {
+                id: savedStudentId || 'temp-' + Date.now(),
+                student_id: savedStudentId || 'temp-' + Date.now(),
+                name: savedUserName,
+                email: savedUserName + "@pilani.bits-pilani.ac.in",
+                phone: '',
+                course: '',
+                semester: '',
+                avatar: defaultProfilePicture
+              };
+              setUserProfile(basicProfile);
+              setUserName(savedUserName);
+              localStorage.setItem("userProfile", JSON.stringify(basicProfile));
             }
+          } else {
+            const basicProfile: UserProfile = {
+              id: savedStudentId || 'temp-' + Date.now(),
+              student_id: savedStudentId || 'temp-' + Date.now(),
+              name: savedUserName,
+              email: savedUserName + "@pilani.bits-pilani.ac.in",
+              phone: '',
+              course: '',
+              semester: '',
+              avatar: defaultProfilePicture
+            };
+            setUserProfile(basicProfile);
+            localStorage.setItem("userProfile", JSON.stringify(basicProfile));
           }
         }
       } catch (error) {
@@ -329,20 +380,29 @@ function AppContent() {
     // Remove any existing theme classes
     document.documentElement.classList.remove('dark', 'light');
     // Apply current theme only for student portal
-    if (isLoggedIn && !isAdmin && theme === 'dark') {
-      document.documentElement.classList.add('dark');
+    if (isLoggedIn && !isAdmin) {
+      if (theme === 'dark') {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.add('light');
+      }
     }
     localStorage.setItem("theme", theme);
   }, [theme, isLoggedIn, isAdmin]);
 
-  // Initialize theme on app load - only apply dark theme for student portal
+  // Initialize theme on app load - apply theme for student portal
   useEffect(() => {
     const savedTheme = localStorage.getItem("theme");
     if (savedTheme && (savedTheme === "dark" || savedTheme === "light")) {
+      setTheme(savedTheme as "light" | "dark");
       document.documentElement.classList.remove('dark', 'light');
-      // Only apply dark theme if logged in as student (not admin)
-      if (savedTheme === 'dark' && isLoggedIn && !isAdmin) {
-        document.documentElement.classList.add('dark');
+      // Apply theme if logged in as student (not admin)
+      if (isLoggedIn && !isAdmin) {
+        if (savedTheme === 'dark') {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.add('light');
+        }
       }
     }
   }, [isLoggedIn, isAdmin]); // Re-run when login state changes
@@ -532,31 +592,139 @@ function AppContent() {
       return;
     }
     
-    // Always use student data from backend - NO DEFAULT PROFILE
-    const profile = {
-      name: studentData.name,
-      id: studentData.id,
-      email: studentData.email,
-      phone: studentData.phone,
-      course: studentData.course,
-      semester: studentData.semester,
-      avatar: studentData.avatar || defaultProfilePicture,
-      campus: studentData.campus || 'BITS Pilani',
-      academicYear: studentData.academicYear || '2024-25'
-    };
+    console.log(`Logging in as: ${studentData.name} (${studentData.id})`);
     
-    console.log(`Logging in as: ${profile.name} (${profile.id})`);
-    
-    const loginTime = new Date().toISOString();
-    setUserName(profile.name);
-    setUserProfile(profile);
+    const studentId = studentData.id;
+    setCurrentStudentId(studentId);
+    setUserName(studentData.name);
     setIsLoggedIn(true);
-    setLastLoginTime(loginTime);
     
+    // Store minimal data in localStorage for session persistence
     localStorage.setItem("isLoggedIn", "true");
-    localStorage.setItem("userName", profile.name);
-    localStorage.setItem("userProfile", JSON.stringify(profile));
-    localStorage.setItem("lastLoginTime", loginTime);
+    localStorage.setItem("currentStudentId", studentId);
+    localStorage.setItem("userName", studentData.name);
+    
+    try {
+      // First, try to load profile from localStorage (more reliable)
+      const profileKey = `userProfile_${studentId}`;
+      const savedProfile = localStorage.getItem(profileKey);
+      
+      if (savedProfile) {
+        try {
+          const localProfile = JSON.parse(savedProfile);
+          setUserProfile(localProfile);
+          console.log('✅ Profile loaded from localStorage:', localProfile);
+          
+          // Try to sync with Supabase in the background
+          setTimeout(async () => {
+            try {
+              const supabaseProfile = await supabaseDatabase.getUserProfile(studentId);
+              if (supabaseProfile && supabaseProfile.avatar !== localProfile.avatar) {
+                console.log('🔄 Syncing profile from Supabase');
+                setUserProfile(supabaseProfile);
+                localStorage.setItem(profileKey, JSON.stringify(supabaseProfile));
+              }
+            } catch (error) {
+              console.warn('Background Supabase sync failed:', error);
+            }
+          }, 1000);
+          
+          return; // Exit early if localStorage profile found
+        } catch (error) {
+          console.warn('Failed to parse localStorage profile, trying Supabase');
+        }
+      }
+      
+      // Fallback: Check if user profile exists in Supabase
+      console.log("🔍 Checking for existing profile in Supabase for student:", studentId);
+      let profile = await supabaseDatabase.getUserProfile(studentId);
+      
+      if (!profile) {
+        console.log("👤 No existing profile found, creating new one...");
+        // Create new profile in Supabase
+        const newProfile: Omit<UserProfile, 'created_at' | 'updated_at'> = {
+          id: studentId,
+          student_id: studentId,
+          name: studentData.name,
+          email: studentData.email || '',
+          phone: studentData.phone || '',
+          course: studentData.course || '',
+          semester: studentData.semester || '',
+          avatar: studentData.avatar || defaultProfilePicture
+        };
+        
+        profile = await supabaseDatabase.createUserProfile(newProfile);
+        console.log('✅ Created new user profile in Supabase:', profile);
+        
+        // Save to localStorage as well
+        if (profile) {
+          localStorage.setItem(profileKey, JSON.stringify(profile));
+        }
+      } else {
+        console.log("👤 Found existing profile in Supabase:", profile);
+        // Save to localStorage for faster future access
+        localStorage.setItem(profileKey, JSON.stringify(profile));
+        
+        // Update existing profile with latest data
+        const updates = {
+          name: studentData.name,
+          email: studentData.email || profile.email,
+          phone: studentData.phone || profile.phone,
+          course: studentData.course || profile.course,
+          semester: studentData.semester || profile.semester
+        };
+        
+        await supabaseDatabase.updateUserProfile(studentId, updates);
+        console.log('🔄 Updated existing user profile in Supabase');
+        
+        // Fetch updated profile
+        profile = await supabaseDatabase.getUserProfile(studentId);
+        console.log('📄 Refreshed profile data:', profile);
+        
+        if (profile) {
+          localStorage.setItem(profileKey, JSON.stringify(profile));
+        }
+      }
+      
+      if (profile) {
+        setUserProfile(profile);
+        console.log('✅ User profile loaded from Supabase:', profile);
+      }
+      
+    } catch (error) {
+      console.error('❌ Error managing user profile in Supabase:', error);
+      
+      // Fallback: Try localStorage again
+      const profileKey = `userProfile_${studentId}`;
+      const savedProfile = localStorage.getItem(profileKey);
+      
+      if (savedProfile) {
+        try {
+          const localProfile = JSON.parse(savedProfile);
+          setUserProfile(localProfile);
+          console.log('✅ Fallback: Profile loaded from localStorage:', localProfile);
+          return;
+        } catch (parseError) {
+          console.warn('Failed to parse localStorage profile');
+        }
+      }
+      
+      // Final fallback: Create basic profile
+      const fallbackProfile: UserProfile = {
+        id: studentId,
+        student_id: studentId,
+        name: studentData.name,
+        email: studentData.email || '',
+        phone: studentData.phone || '',
+        course: studentData.course || '',
+        semester: studentData.semester || '',
+        avatar: studentData.avatar || defaultProfilePicture
+      };
+      
+      setUserProfile(fallbackProfile);
+      localStorage.setItem(profileKey, JSON.stringify(fallbackProfile));
+      console.log('🔧 Created fallback profile:', fallbackProfile);
+    }
 
     // Immediately fetch courses after login
     try {
@@ -611,6 +779,7 @@ function AppContent() {
     setIsAdmin(false);
     setUserName("");
     setUserProfile(null);
+    setCurrentStudentId("");
     setActiveTab("dashboard");
     setShowAdminLogin(false);
     
@@ -618,6 +787,7 @@ function AppContent() {
     localStorage.removeItem("isLoggedIn");
     localStorage.removeItem("isAdmin");
     localStorage.removeItem("userName");
+    localStorage.removeItem("currentStudentId");
     localStorage.removeItem("userProfile");
     
     // Remove dark theme on logout
@@ -849,11 +1019,28 @@ function AppContent() {
     );
   }
 
-  // If logged in but no profile, force re-login
+  // If logged in but no profile, wait for initialization or create basic profile
   if (isLoggedIn && !isAdmin && !userProfile) {
-    console.warn("Logged in but no profile found, forcing re-login");
-    handleLogout();
-    return null;
+    // Give time for profile to load from localStorage during initialization
+    if (!isInitialized) {
+      return <LoadingSpinner />;
+    }
+    
+    // Create a basic profile if none exists after initialization
+    console.warn("No profile found after initialization, creating basic profile");
+    const basicProfile: UserProfile = {
+      id: currentStudentId || 'temp-' + Date.now(),
+      student_id: currentStudentId || 'temp-' + Date.now(),
+      name: userName || "Student",
+      email: (userName || "student") + "@pilani.bits-pilani.ac.in", 
+      phone: '',
+      course: '',
+      semester: '',
+      avatar: defaultProfilePicture
+    };
+    setUserProfile(basicProfile);
+    localStorage.setItem("userProfile", JSON.stringify(basicProfile));
+    return <LoadingSpinner />;
   }
 
   // Show admin dashboard if logged in as admin
@@ -890,12 +1077,48 @@ function AppContent() {
     onThemeToggle: handleThemeToggle,
     theme,
     onProfileEdit: () => setIsProfileDialogOpen(true),
-    onProfileUpdate: (updatedProfile: any) => {
-      setUserProfile(updatedProfile);
+    onProfileUpdate: async (updatedProfile: any) => {
+      console.log("🔄 onProfileUpdate called with:", updatedProfile);
+      console.log("🔍 Current student ID:", currentStudentId);
+      
+      // Always save to localStorage first (primary storage)
+      const profileKey = `userProfile_${currentStudentId}`;
+      localStorage.setItem(profileKey, JSON.stringify(updatedProfile));
       localStorage.setItem("userProfile", JSON.stringify(updatedProfile));
-      console.log("Profile updated:", updatedProfile);
+      console.log("💾 Profile saved to localStorage:", profileKey);
+      
+      setUserProfile(updatedProfile);
+      console.log("Profile updated in local state:", updatedProfile);
+      
+      // Try to save to Supabase database (secondary/backup storage)
+      if (currentStudentId) {
+        try {
+          console.log("💾 Attempting to save to Supabase...");
+          const success = await supabaseDatabase.updateUserProfile(currentStudentId, {
+            name: updatedProfile.name,
+            email: updatedProfile.email,
+            phone: updatedProfile.phone,
+            course: updatedProfile.course,
+            semester: updatedProfile.semester,
+            avatar: updatedProfile.avatar
+          });
+          
+          if (success) {
+            console.log("✅ Profile saved to Supabase successfully");
+          } else {
+            console.warn("⚠️ Failed to save profile to Supabase, using localStorage");
+          }
+        } catch (error) {
+          console.error("Error saving profile to Supabase:", error);
+          // Fallback to localStorage
+          localStorage.setItem("userProfile", JSON.stringify(updatedProfile));
+        }
+      } else {
+        // Fallback to localStorage if no student ID
+        localStorage.setItem("userProfile", JSON.stringify(updatedProfile));
+      }
     },
-    userProfile: userProfile || { name: "Guest", id: "", email: "", phone: "", course: "", semester: "", avatar: defaultProfilePicture },
+    userProfile: userProfile || { name: "Guest", id: "", student_id: "", email: "", phone: "", course: "", semester: "", avatar: defaultProfilePicture },
     courses,
     notes: notes,
     events,
@@ -1211,11 +1434,11 @@ function AppContent() {
             )}
 
             {activeTab === "settings" && (
-              <SettingsPage
+              <SettingsPage 
                 userProfile={userProfile}
                 theme={theme}
                 onThemeToggle={handleThemeToggle}
-                onProfileUpdate={(updatedProfile: any) => {
+                onProfileUpdate={(updatedProfile) => {
                   setUserProfile(updatedProfile);
                   localStorage.setItem("userProfile", JSON.stringify(updatedProfile));
                 }}
@@ -1240,7 +1463,7 @@ function AppContent() {
         events={events} 
         courses={courses}
         userName={userName || "Guest"}
-        userProfile={userProfile || { name: userName || "Guest", id: "", email: "", phone: "", course: "", semester: "", avatar: defaultProfilePicture }}
+        userProfile={userProfile || { name: userName || "Guest", id: "", student_id: userName || "", email: "", phone: "", course: "", semester: "", avatar: defaultProfilePicture }}
         announcements={announcements}
         notes={notes}
       />
@@ -1251,12 +1474,15 @@ function AppContent() {
           isOpen={isProfileDialogOpen}
           onClose={() => setIsProfileDialogOpen(false)}
           userProfile={userProfile}
-          onSave={(updatedProfile) => {
-            setUserProfile(updatedProfile);
+          onSave={async (updatedProfile) => {
+            console.log("🔄 ProfileEditDialog onSave called with:", updatedProfile);
             setUserName(updatedProfile.name);
             setIsProfileDialogOpen(false);
-            localStorage.setItem("userProfile", JSON.stringify(updatedProfile));
-            localStorage.setItem("userName", updatedProfile.name);
+            
+            // Use the existing onProfileUpdate function that saves to Supabase
+            console.log("🔄 Calling headerProps.onProfileUpdate...");
+            await headerProps.onProfileUpdate(updatedProfile);
+            console.log("✅ Profile update completed");
           }}
         />
       )}

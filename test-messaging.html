@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Cross-Session Messaging Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .test-section { border: 1px solid #ccc; padding: 15px; margin: 10px 0; border-radius: 5px; }
+        .user-section { background-color: #f9f9f9; }
+        button { padding: 10px 15px; margin: 5px; background: #007cba; color: white; border: none; border-radius: 3px; cursor: pointer; }
+        button:hover { background: #005a87; }
+        .messages { background: #fff; border: 1px solid #ddd; padding: 10px; min-height: 100px; margin: 10px 0; }
+        .message { padding: 5px; margin: 5px 0; border-left: 3px solid #007cba; }
+        input[type="text"] { padding: 8px; width: 300px; margin: 5px; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 3px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .debug { background: #e2e3e5; color: #383d41; font-family: monospace; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Cross-Session Messaging Test</h1>
+        <p>This page tests the cross-session messaging functionality between students.</p>
+        
+        <div class="test-section user-section">
+            <h3>👨‍🎓 HARI HARA SUDHAN</h3>
+            <button onclick="sendAsHari()">Send Message as Hari</button>
+            <input type="text" id="hariMessage" placeholder="Enter message from Hari..." value="Hi Priya! How are your studies going?">
+            <div class="messages" id="hariMessages"></div>
+        </div>
+
+        <div class="test-section user-section">
+            <h3>👩‍🎓 Priya Patel</h3>
+            <button onclick="sendAsPriya()">Send Message as Priya</button>
+            <input type="text" id="priyaMessage" placeholder="Enter message from Priya..." value="Hi Hari! They're going well. How about yours?">
+            <div class="messages" id="priyaMessages"></div>
+        </div>
+
+        <div class="test-section user-section">
+            <h3>👨‍🎓 Arjun Gupta</h3>
+            <button onclick="sendAsArjun()">Send Message as Arjun</button>
+            <input type="text" id="arjunMessage" placeholder="Enter message from Arjun..." value="Hey everyone! Anyone up for a study group?">
+            <div class="messages" id="arjunMessages"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🔧 Controls</h3>
+            <button onclick="refreshMessages()">🔄 Refresh All Messages</button>
+            <button onclick="clearMessages()">🗑️ Clear All Messages</button>
+            <button onclick="showDebugInfo()">🐛 Show Debug Info</button>
+            <button onclick="simulateConversation()">🎭 Simulate Conversation</button>
+        </div>
+
+        <div class="status" id="status"></div>
+        <div class="debug" id="debugInfo" style="display: none;"></div>
+    </div>
+
+    <script>
+        // Import the cross-session messaging utility
+        // In a real implementation, this would be imported as a module
+        class CrossSessionMessaging {
+            constructor() {
+                this.storageKey = 'cross_session_messages';
+                this.chatsKey = 'cross_session_chats';
+            }
+
+            getUserName(userId) {
+                const students = {
+                    'student-hari': 'HARI HARA SUDHAN',
+                    'student-priya': 'Priya Patel',
+                    'student-arjun': 'Arjun Gupta',
+                    'student-sneha': 'Sneha Singh',
+                    'student-vikram': 'Vikram Reddy'
+                };
+                return students[userId] || userId;
+            }
+
+            generateChatId(user1Id, user2Id) {
+                return [user1Id, user2Id].sort().join('_');
+            }
+
+            sendMessage(fromUserId, toUserId, content, type = 'text') {
+                const chatId = this.generateChatId(fromUserId, toUserId);
+                const message = {
+                    id: Date.now().toString(),
+                    fromUserId,
+                    toUserId,
+                    content,
+                    type,
+                    timestamp: new Date().toISOString(),
+                    chatId,
+                    fromUserName: this.getUserName(fromUserId)
+                };
+
+                // Get existing messages
+                const messages = this.getMessages(fromUserId, toUserId);
+                messages.push(message);
+
+                // Store updated messages
+                const allMessages = JSON.parse(localStorage.getItem(this.storageKey) || '{}');
+                allMessages[chatId] = messages;
+                localStorage.setItem(this.storageKey, JSON.stringify(allMessages));
+
+                // Update recent chats for both users
+                this.updateRecentChats(fromUserId, toUserId, message);
+                this.updateRecentChats(toUserId, fromUserId, message);
+
+                console.log(`✅ Message sent from ${this.getUserName(fromUserId)} to ${this.getUserName(toUserId)}:`, message);
+                return message;
+            }
+
+            getMessages(user1Id, user2Id) {
+                const chatId = this.generateChatId(user1Id, user2Id);
+                const allMessages = JSON.parse(localStorage.getItem(this.storageKey) || '{}');
+                return allMessages[chatId] || [];
+            }
+
+            updateRecentChats(userId, otherUserId, lastMessage) {
+                const recentChats = JSON.parse(localStorage.getItem(this.chatsKey) || '{}');
+                if (!recentChats[userId]) {
+                    recentChats[userId] = [];
+                }
+
+                const existingChatIndex = recentChats[userId].findIndex(chat => chat.id === otherUserId);
+                const chatData = {
+                    id: otherUserId,
+                    name: this.getUserName(otherUserId),
+                    type: 'private',
+                    lastMessage: lastMessage.content,
+                    timestamp: lastMessage.timestamp,
+                    avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(this.getUserName(otherUserId))}&background=007cba&color=fff`
+                };
+
+                if (existingChatIndex >= 0) {
+                    recentChats[userId][existingChatIndex] = chatData;
+                } else {
+                    recentChats[userId].unshift(chatData);
+                }
+
+                // Keep only the 10 most recent chats
+                recentChats[userId] = recentChats[userId].slice(0, 10);
+                localStorage.setItem(this.chatsKey, JSON.stringify(recentChats));
+            }
+
+            getRecentChats(userId) {
+                const recentChats = JSON.parse(localStorage.getItem(this.chatsKey) || '{}');
+                return recentChats[userId] || [];
+            }
+        }
+
+        const messaging = new CrossSessionMessaging();
+
+        function sendAsHari() {
+            const message = document.getElementById('hariMessage').value;
+            if (message.trim()) {
+                messaging.sendMessage('student-hari', 'student-priya', message);
+                updateStatus('Message sent from Hari to Priya!', 'success');
+                setTimeout(refreshMessages, 500);
+            }
+        }
+
+        function sendAsPriya() {
+            const message = document.getElementById('priyaMessage').value;
+            if (message.trim()) {
+                messaging.sendMessage('student-priya', 'student-hari', message);
+                updateStatus('Message sent from Priya to Hari!', 'success');
+                setTimeout(refreshMessages, 500);
+            }
+        }
+
+        function sendAsArjun() {
+            const message = document.getElementById('arjunMessage').value;
+            if (message.trim()) {
+                messaging.sendMessage('student-arjun', 'student-hari', message);
+                updateStatus('Message sent from Arjun to Hari!', 'success');
+                setTimeout(refreshMessages, 500);
+            }
+        }
+
+        function refreshMessages() {
+            // Messages between Hari and Priya
+            const hariPriyaMessages = messaging.getMessages('student-hari', 'student-priya');
+            displayMessages('hariMessages', hariPriyaMessages, 'Hari ↔ Priya');
+
+            // Messages between Arjun and Hari
+            const arjunHariMessages = messaging.getMessages('student-arjun', 'student-hari');
+            displayMessages('arjunMessages', arjunHariMessages, 'Arjun ↔ Hari');
+
+            updateStatus('Messages refreshed!', 'success');
+        }
+
+        function displayMessages(containerId, messages, title) {
+            const container = document.getElementById(containerId);
+            if (messages.length === 0) {
+                container.innerHTML = `<strong>${title}</strong><br><em>No messages yet...</em>`;
+                return;
+            }
+
+            let html = `<strong>${title}</strong><br>`;
+            messages.forEach(msg => {
+                const time = new Date(msg.timestamp).toLocaleTimeString();
+                html += `<div class="message">
+                    <strong>${msg.fromUserName}:</strong> ${msg.content}
+                    <small style="float: right; color: #666;">${time}</small>
+                </div>`;
+            });
+            container.innerHTML = html;
+        }
+
+        function clearMessages() {
+            localStorage.removeItem('cross_session_messages');
+            localStorage.removeItem('cross_session_chats');
+            refreshMessages();
+            updateStatus('All messages cleared!', 'success');
+        }
+
+        function showDebugInfo() {
+            const debugDiv = document.getElementById('debugInfo');
+            const isVisible = debugDiv.style.display !== 'none';
+            
+            if (isVisible) {
+                debugDiv.style.display = 'none';
+                return;
+            }
+
+            const messages = JSON.parse(localStorage.getItem('cross_session_messages') || '{}');
+            const chats = JSON.parse(localStorage.getItem('cross_session_chats') || '{}');
+            
+            debugDiv.innerHTML = `
+                <h4>Debug Information:</h4>
+                <h5>Stored Messages:</h5>
+                <pre>${JSON.stringify(messages, null, 2)}</pre>
+                <h5>Recent Chats:</h5>
+                <pre>${JSON.stringify(chats, null, 2)}</pre>
+            `;
+            debugDiv.style.display = 'block';
+        }
+
+        function simulateConversation() {
+            updateStatus('Simulating conversation...', 'success');
+            
+            setTimeout(() => {
+                messaging.sendMessage('student-hari', 'student-priya', 'Hey Priya! Are you ready for the exam tomorrow?');
+            }, 500);
+            
+            setTimeout(() => {
+                messaging.sendMessage('student-priya', 'student-hari', 'Hi Hari! Yes, I\'ve been studying all week. How about you?');
+            }, 1500);
+            
+            setTimeout(() => {
+                messaging.sendMessage('student-hari', 'student-priya', 'Same here! Want to do a quick review session?');
+            }, 2500);
+            
+            setTimeout(() => {
+                messaging.sendMessage('student-arjun', 'student-hari', 'Hey Hari! Can I join your study session?');
+            }, 3500);
+            
+            setTimeout(() => {
+                messaging.sendMessage('student-hari', 'student-arjun', 'Of course Arjun! The more the merrier.');
+            }, 4500);
+            
+            setTimeout(() => {
+                refreshMessages();
+                updateStatus('Conversation simulation complete!', 'success');
+            }, 5500);
+        }
+
+        function updateStatus(message, type) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${type}`;
+            
+            if (type === 'success') {
+                setTimeout(() => {
+                    statusDiv.textContent = '';
+                    statusDiv.className = 'status';
+                }, 3000);
+            }
+        }
+
+        // Initial load
+        refreshMessages();
+        updateStatus('Cross-session messaging test page loaded. Student names synchronized with admin system.', 'success');
+    </script>
+</body>
+</html>

@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { students, validateStudentCredentials } from '../data/studentsData';
 
 interface AuthContextType {
   isLoggedIn: boolean;
@@ -83,54 +84,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
           return { success: true };
         }
       } else {
-        // Student credentials check - validate against all students
-        const students = [
-          {
-            id: "2021wa15025",
-            name: "HARI HARA SUDHAN",
-            username: "2021wa15025@wilp.bits-pilani.ac.in",
-            email: "2021wa15025@wilp.bits-pilani.ac.in",
-            password: "student123",
-            course: "M.Tech Software Systems"
-          },
-          {
-            id: "2021wa15026",
-            name: "Priya Patel", 
-            username: "2021wa15026@wilp.bits-pilani.ac.in",
-            email: "2021wa15026@wilp.bits-pilani.ac.in",
-            password: "student123",
-            course: "M.Tech Software Systems"
-          },
-          {
-            id: "2021wa15027",
-            name: "Arjun Gupta",
-            username: "2021wa15027@wilp.bits-pilani.ac.in",
-            email: "2021wa15027@wilp.bits-pilani.ac.in",
-            password: "student123",
-            course: "M.Tech Software Systems"
-          },
-          {
-            id: "2021wa15028",
-            name: "Sneha Singh",
-            username: "2021wa15028@wilp.bits-pilani.ac.in",
-            email: "2021wa15028@wilp.bits-pilani.ac.in",
-            password: "student123",
-            course: "M.Tech Software Systems"
-          },
-          {
-            id: "2021wa15029",
-            name: "Vikram Reddy",
-            username: "2021wa15029@wilp.bits-pilani.ac.in",
-            email: "2021wa15029@wilp.bits-pilani.ac.in",
-            password: "student123",
-            course: "M.Tech Software Systems"
-          }
-        ];
-
-        // Find matching student
-        const matchingStudent = students.find(student => 
-          student.email === email && student.password === password
-        );
+        // Student credentials check - use centralized student data
+        const matchingStudent = validateStudentCredentials(email, password);
 
         if (matchingStudent) {
           setIsLoggedIn(true);
@@ -149,8 +104,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
             id: matchingStudent.id,
             name: matchingStudent.name,
             email: matchingStudent.email,
-            phone: "+91-9876543210", // Default phone
-            course: matchingStudent.course
+            phone: matchingStudent.phone || "+91-9876543210",
+            course: matchingStudent.course,
+            semester: matchingStudent.semester || "4"
           };
           
           return { success: true, studentData };

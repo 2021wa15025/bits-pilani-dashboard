@@ -1,209 +1,203 @@
-import { createClient } from '@supabase/supabase-js';
+// Cross-session messaging using localStorage with a polling mechanism
+// This creates a shared message store that works across different browser sessions
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
-interface Message {
-  id: string;
-  senderId: string;
-  senderName: string;
-  senderAvatar?: string;
-  content: string;
-  timestamp: string;
-  type: 'text' | 'file' | 'system';
-  fileAttachment?: {
-    name: string;
-    size: number;
-    type: string;
-    url: string;
-  };
-}
-
-interface PrivateChat {
-  id: string;
-  participantId: string;
-  participantName: string;
-  participantEmail: string;
-  participantAvatar: string;
-  unreadCount: number;
-  lastMessage?: Message;
-}
-
-interface GroupData {
-  name: string;
-  description?: string;
-  members: Array<{ id: string; name: string; role: 'admin' | 'member' }>;
-  createdBy: string;
-}
-
-interface ChatGroup {
-  id: string;
-  name: string;
-  description?: string;
-  members: Array<{
-    id: string;
-    name: string;
-    email: string;
-    avatar: string;
-    role: 'admin' | 'member';
-  }>;
-  unreadCount: number;
-  createdAt: string;
-  createdBy: string;
-}
+import { getStudentById } from '../data/studentsData';
 
 export class CrossSessionMessaging {
-  private storageKey = 'cross_session_messages';
+  private static MESSAGES_KEY = 'global_chat_messages';
+  private static CHATS_KEY = 'global_chat_list';
+  private listeners: ((messages: any[]) => void)[] = [];
+  private pollInterval: NodeJS.Timeout | null = null;
+  private lastMessageCount = 0;
 
-  getRecentChats(userId: string): PrivateChat[] {
+  constructor() {
+    this.initializeStorage();
+    this.startPolling();
+    console.log('🔧 CrossSessionMessaging initialized');
+  }
+
+  private initializeStorage() {
+    if (!localStorage.getItem(CrossSessionMessaging.MESSAGES_KEY)) {
+      localStorage.setItem(CrossSessionMessaging.MESSAGES_KEY, JSON.stringify({}));
+      console.log('📦 Initialized messages storage');
+    }
+    if (!localStorage.getItem(CrossSessionMessaging.CHATS_KEY)) {
+      localStorage.setItem(CrossSessionMessaging.CHATS_KEY, JSON.stringify({}));
+      console.log('📦 Initialized chats storage');
+    }
+  }
+
+  private startPolling() {
+    // Poll for new messages every 2 seconds
+    this.pollInterval = setInterval(() => {
+      this.checkForNewMessages();
+    }, 2000);
+    console.log('⏰ Started polling for new messages every 2 seconds');
+  }
+
+  private checkForNewMessages() {
     try {
-      const data = localStorage.getItem(this.storageKey);
-      if (!data) return [];
+      const allMessages = this.getAllMessages();
+      let totalMessages = 0;
       
-      const allChats = JSON.parse(data);
-      return allChats.filter((chat: PrivateChat) => 
-        chat.participantId === userId || chat.id === userId
+      Object.values(allMessages).forEach((msgs: unknown) => {
+        if (Array.isArray(msgs)) {
+          totalMessages += msgs.length;
+        }
+      });
+      
+      if (totalMessages !== this.lastMessageCount) {
+        this.lastMessageCount = totalMessages;
+        this.notifyListeners(allMessages);
+      }
+    } catch (error) {
+      console.error('Error checking for new messages:', error);
+    }
+  }
+
+  private notifyListeners(messages: any) {
+    this.listeners.forEach(listener => listener(messages));
+  }
+
+  public sendMessage(senderId: string, recipientId: string, message: any): boolean {
+    try {
+      console.log(`📤 CrossSession: Sending message from ${senderId} to ${recipientId}`);
+      console.log(`📝 Message content:`, message);
+      
+      const allMessages = this.getAllMessages();
+      const chatKey = this.getChatKey(senderId, recipientId);
+      
+      console.log(`📝 CrossSession: Using chat key: ${chatKey}`);
+      
+      if (!allMessages[chatKey]) {
+        allMessages[chatKey] = [];
+        console.log(`📁 Created new chat thread: ${chatKey}`);
+      }
+      
+      const messageWithId = {
+        ...message,
+        id: `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        timestamp: new Date().toISOString(),
+        senderId,
+        recipientId,
+        senderName: this.getUserName(senderId)
+      };
+      
+      allMessages[chatKey].push(messageWithId);
+      localStorage.setItem(CrossSessionMessaging.MESSAGES_KEY, JSON.stringify(allMessages));
+      
+      console.log(`✅ CrossSession: Message stored successfully. Total messages in chat: ${allMessages[chatKey].length}`);
+      console.log(`📊 All messages stored:`, allMessages);
+      
+      // Update chat list for both users
+      this.updateChatList(senderId, recipientId, messageWithId);
+      
+      // Trigger listeners immediately
+      this.notifyListeners(allMessages);
+      
+      return true;
+    } catch (error) {
+      console.error('❌ CrossSession: Error sending message:', error);
+      return false;
+    }
+  }
+
+  public getMessages(userId: string, otherUserId: string): any[] {
+    const allMessages = this.getAllMessages();
+    const chatKey = this.getChatKey(userId, otherUserId);
+    return allMessages[chatKey] || [];
+  }
+
+  public getRecentChats(userId: string): any[] {
+    try {
+      const allChats = JSON.parse(localStorage.getItem(CrossSessionMessaging.CHATS_KEY) || '{}');
+      const userChats = allChats[userId] || {};
+      
+      return Object.values(userChats).sort((a: any, b: any) => 
+        new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime()
       );
     } catch (error) {
-      console.error('Error loading chats:', error);
+      console.error('Error getting recent chats:', error);
       return [];
     }
   }
 
-  async sendMessage(senderId: string, recipientId: string, messageData: any): Promise<boolean> {
+  private getAllMessages(): any {
     try {
-      const message: Message = {
-        id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        senderId,
-        senderName: messageData.senderName || 'Unknown',
-        senderAvatar: messageData.senderAvatar,
-        content: messageData.content,
-        timestamp: new Date().toISOString(),
-        type: messageData.type || 'text',
-        fileAttachment: messageData.fileAttachment
+      return JSON.parse(localStorage.getItem(CrossSessionMessaging.MESSAGES_KEY) || '{}');
+    } catch (error) {
+      console.error('Error parsing messages from localStorage:', error);
+      return {};
+    }
+  }
+
+  private getChatKey(userId1: string, userId2: string): string {
+    // Always use the same key regardless of who sends first
+    return [userId1, userId2].sort().join('_');
+  }
+
+  private updateChatList(senderId: string, recipientId: string, message: any) {
+    try {
+      const allChats = JSON.parse(localStorage.getItem(CrossSessionMessaging.CHATS_KEY) || '{}');
+      
+      // Get email from centralized student data
+      const getStudentEmail = (userId: string): string => {
+        const student = getStudentById(userId);
+        return student?.email || '';
       };
-
-      // Store in localStorage for now
-      const storageKey = `messages_${senderId}_${recipientId}`;
-      const existing = localStorage.getItem(storageKey);
-      const messages = existing ? JSON.parse(existing) : [];
-      messages.push(message);
-      localStorage.setItem(storageKey, JSON.stringify(messages));
-
-      return true;
-    } catch (error) {
-      console.error('Error sending message:', error);
-      return false;
-    }
-  }
-
-  async getMessages(userId: string, otherUserId: string): Promise<Message[]> {
-    try {
-      const storageKey = `messages_${userId}_${otherUserId}`;
-      const data = localStorage.getItem(storageKey);
-      return data ? JSON.parse(data) : [];
-    } catch (error) {
-      console.error('Error loading messages:', error);
-      return [];
-    }
-  }
-
-  async getGroups(): Promise<ChatGroup[]> {
-    try {
-      const data = localStorage.getItem('chat_groups');
-      return data ? JSON.parse(data) : [];
-    } catch (error) {
-      console.error('Error loading groups:', error);
-      return [];
-    }
-  }
-
-  async createGroup(groupData: GroupData): Promise<boolean> {
-    try {
-      const group: ChatGroup = {
-        id: `group_${Date.now()}`,
-        name: groupData.name,
-        description: groupData.description,
-        members: groupData.members.map(m => ({
-          ...m,
-          email: `${m.id}@example.com`,
-          avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${m.name}`
-        })),
-        unreadCount: 0,
-        createdAt: new Date().toISOString(),
-        createdBy: groupData.createdBy
+      
+      // Update sender's chat list
+      if (!allChats[senderId]) allChats[senderId] = {};
+      allChats[senderId][recipientId] = {
+        id: recipientId,
+        participantId: recipientId,
+        participantName: this.getUserName(recipientId),
+        participantEmail: getStudentEmail(recipientId),
+        participantAvatar: '',
+        lastMessage: message,
+        lastMessageTime: message.timestamp,
+        unreadCount: 0
       };
-
-      const existing = localStorage.getItem('chat_groups');
-      const groups = existing ? JSON.parse(existing) : [];
-      groups.push(group);
-      localStorage.setItem('chat_groups', JSON.stringify(groups));
-
-      return true;
-    } catch (error) {
-      console.error('Error creating group:', error);
-      return false;
-    }
-  }
-
-  async sendGroupMessage(senderId: string, groupId: string, messageData: any): Promise<boolean> {
-    try {
-      const message: Message = {
-        id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        senderId,
-        senderName: messageData.senderName || 'Unknown',
-        senderAvatar: messageData.senderAvatar,
-        content: messageData.content,
-        timestamp: new Date().toISOString(),
-        type: messageData.type || 'text',
-        fileAttachment: messageData.fileAttachment
+      
+      // Update recipient's chat list
+      if (!allChats[recipientId]) allChats[recipientId] = {};
+      allChats[recipientId][senderId] = {
+        id: senderId,
+        participantId: senderId,
+        participantName: message.senderName || this.getUserName(senderId),
+        participantEmail: getStudentEmail(senderId),
+        participantAvatar: message.senderAvatar || '',
+        lastMessage: message,
+        lastMessageTime: message.timestamp,
+        unreadCount: (allChats[recipientId][senderId]?.unreadCount || 0) + 1
       };
-
-      const storageKey = `group_messages_${groupId}`;
-      const existing = localStorage.getItem(storageKey);
-      const messages = existing ? JSON.parse(existing) : [];
-      messages.push(message);
-      localStorage.setItem(storageKey, JSON.stringify(messages));
-
-      return true;
+      
+      localStorage.setItem(CrossSessionMessaging.CHATS_KEY, JSON.stringify(allChats));
     } catch (error) {
-      console.error('Error sending group message:', error);
-      return false;
+      console.error('Error updating chat list:', error);
     }
   }
 
-  async getGroupMessages(groupId: string): Promise<Message[]> {
-    try {
-      const storageKey = `group_messages_${groupId}`;
-      const data = localStorage.getItem(storageKey);
-      return data ? JSON.parse(data) : [];
-    } catch (error) {
-      console.error('Error loading group messages:', error);
-      return [];
-    }
+  private getUserName(userId: string): string {
+    // Get name from centralized student data
+    const student = getStudentById(userId);
+    return student ? student.name : 'Unknown User';
   }
 
-  onMessage(callback: (messages: Message[]) => void): () => void {
-    // Simple polling mechanism for localStorage changes
-    const interval = setInterval(() => {
-      // This is a simplified version - in production, use proper event listeners
-      const allMessages: Message[] = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key?.startsWith('messages_') || key?.startsWith('group_messages_')) {
-          const data = localStorage.getItem(key);
-          if (data) {
-            allMessages.push(...JSON.parse(data));
-          }
-        }
-      }
-      callback(allMessages);
-    }, 2000);
+  public onMessage(callback: (messages: any[]) => void) {
+    this.listeners.push(callback);
+    return () => {
+      this.listeners = this.listeners.filter(l => l !== callback);
+    };
+  }
 
-    return () => clearInterval(interval);
+  public destroy() {
+    if (this.pollInterval) {
+      clearInterval(this.pollInterval);
+    }
+    this.listeners = [];
   }
 }
 
-export const supabaseCrossSessionMessaging = new CrossSessionMessaging();
+// Create a singleton instance
+export const crossSessionMessaging = new CrossSessionMessaging();

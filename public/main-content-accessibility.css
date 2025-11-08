@@ -25,25 +25,41 @@
   line-height: 1.8;
 }
 
-/* Text adjustments */
-.university-content.accessibility-text-large {
-  font-size: 115% !important;
-}
-
-.university-content.accessibility-text-large * {
-  font-size: inherit !important;
-}
-
+/* Text adjustments using CSS custom properties */
+.university-content.accessibility-text-large,
 .university-content.accessibility-text-xlarge {
-  font-size: 130% !important;
+  font-size: var(--font-size) !important;
 }
 
+.university-content.accessibility-text-large *,
 .university-content.accessibility-text-xlarge * {
   font-size: inherit !important;
 }
 
+/* Apply font size to all text elements within the content */
+.university-content.accessibility-text-large p,
+.university-content.accessibility-text-large div,
+.university-content.accessibility-text-large span,
+.university-content.accessibility-text-large h1,
+.university-content.accessibility-text-large h2,
+.university-content.accessibility-text-large h3,
+.university-content.accessibility-text-large h4,
+.university-content.accessibility-text-large h5,
+.university-content.accessibility-text-large h6,
+.university-content.accessibility-text-xlarge p,
+.university-content.accessibility-text-xlarge div,
+.university-content.accessibility-text-xlarge span,
+.university-content.accessibility-text-xlarge h1,
+.university-content.accessibility-text-xlarge h2,
+.university-content.accessibility-text-xlarge h3,
+.university-content.accessibility-text-xlarge h4,
+.university-content.accessibility-text-xlarge h5,
+.university-content.accessibility-text-xlarge h6 {
+  font-size: var(--font-size) !important;
+}
+
 .university-content.accessibility-line-height {
-  line-height: 1.8 !important;
+  line-height: var(--line-height-multiplier, 1.8) !important;
 }
 
 .university-content.accessibility-line-height * {

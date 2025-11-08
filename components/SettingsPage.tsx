@@ -7,6 +7,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Switch } from './ui/switch';
 import { Separator } from './ui/separator';
+import { Slider } from './ui/slider';
 import AccessibilitySettings from './AccessibilitySettings';
 import { 
   User, 
@@ -35,6 +36,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   onThemeToggle,
   onProfileUpdate
 }) => {
+  const [localProfile, setLocalProfile] = React.useState(userProfile || {});
   const [notifications, setNotifications] = React.useState({
     emailNotifications: true,
     pushNotifications: true,
@@ -51,6 +53,74 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     dataCollection: true,
     analytics: true
   });
+
+  const [brightness, setBrightness] = React.useState(100);
+
+  // Load settings from localStorage
+  React.useEffect(() => {
+    const savedNotifications = localStorage.getItem('notificationSettings');
+    const savedPrivacy = localStorage.getItem('privacySettings');
+    const savedBrightness = localStorage.getItem('brightnessLevel');
+    
+    if (savedNotifications) {
+      try {
+        setNotifications(JSON.parse(savedNotifications));
+      } catch (e) {
+        console.warn('Failed to parse notification settings');
+      }
+    }
+    
+    if (savedPrivacy) {
+      try {
+        setPrivacy(JSON.parse(savedPrivacy));
+      } catch (e) {
+        console.warn('Failed to parse privacy settings');
+      }
+    }
+
+    if (savedBrightness) {
+      const brightnessValue = parseInt(savedBrightness);
+      setBrightness(brightnessValue);
+      applyBrightness(brightnessValue);
+    }
+  }, []);
+
+  // Save notifications when they change
+  React.useEffect(() => {
+    localStorage.setItem('notificationSettings', JSON.stringify(notifications));
+  }, [notifications]);
+
+  // Save privacy when they change
+  React.useEffect(() => {
+    localStorage.setItem('privacySettings', JSON.stringify(privacy));
+  }, [privacy]);
+
+  // Save and apply brightness when it changes
+  React.useEffect(() => {
+    localStorage.setItem('brightnessLevel', brightness.toString());
+    applyBrightness(brightness);
+  }, [brightness]);
+
+  // Function to apply brightness to the page
+  const applyBrightness = (value: number) => {
+    const brightnessValue = value / 100; // Convert to 0-1 range
+    document.documentElement.style.filter = `brightness(${brightnessValue})`;
+  };
+
+  // Update local profile when userProfile prop changes
+  React.useEffect(() => {
+    if (userProfile) {
+      setLocalProfile(userProfile);
+    }
+  }, [userProfile]);
+
+  const handleProfileUpdate = (field: string, value: string) => {
+    const updatedProfile = { ...localProfile, [field]: value };
+    setLocalProfile(updatedProfile);
+    if (onProfileUpdate) {
+      onProfileUpdate(updatedProfile);
+    }
+  };
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
@@ -124,9 +194,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                   <Label htmlFor="phone">Phone</Label>
                   <Input
                     id="phone"
-                    value={userProfile?.phone || ''}
-                    readOnly
-                    className="bg-gray-50 dark:bg-gray-800"
+                    value={localProfile?.phone || ''}
+                    onChange={(e) => handleProfileUpdate('phone', e.target.value)}
+                    placeholder="Enter your phone number"
                   />
                 </div>
                 <div className="space-y-2">
@@ -150,7 +220,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               </div>
               <div className="pt-4">
                 <Badge variant="outline" className="text-xs">
-                  Profile information is read-only and managed by the university
+                  Profile information is managed by the university
                 </Badge>
               </div>
             </CardContent>
@@ -170,16 +240,71 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 <div className="space-y-1">
                   <Label className="text-base font-medium">Dark Mode</Label>
                   <p className="text-sm text-muted-foreground">
-                    Switch between light and dark themes
+                    Switch between light and dark themes (Current: {theme})
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
                   <Sun className="w-4 h-4" />
                   <Switch
                     checked={theme === 'dark'}
-                    onCheckedChange={onThemeToggle}
+                    onCheckedChange={(checked) => {
+                      console.log('Theme toggle clicked:', checked ? 'dark' : 'light');
+                      onThemeToggle();
+                    }}
                   />
                   <Moon className="w-4 h-4" />
+                </div>
+              </div>
+              
+              <Separator />
+
+              <div className="space-y-4">
+                <div className="space-y-1">
+                  <Label className="text-base font-medium">Brightness</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Adjust screen brightness ({brightness}%)
+                  </p>
+                </div>
+                <div className="space-y-3">
+                  <Slider
+                    value={[brightness]}
+                    onValueChange={(value) => setBrightness(value[0])}
+                    max={150}
+                    min={20}
+                    step={5}
+                    className="w-full"
+                  />
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>20%</span>
+                    <span>100%</span>
+                    <span>150%</span>
+                  </div>
+                  <div className="flex gap-2 justify-center">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setBrightness(50)}
+                      className="text-xs"
+                    >
+                      Low
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setBrightness(100)}
+                      className="text-xs"
+                    >
+                      Normal
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setBrightness(125)}
+                      className="text-xs"
+                    >
+                      Bright
+                    </Button>
+                  </div>
                 </div>
               </div>
               
@@ -370,15 +495,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           </Card>
         </TabsContent>
       </Tabs>
-
-      <div className="mt-8 flex justify-end gap-3">
-        <Button variant="outline">
-          Reset to Defaults
-        </Button>
-        <Button>
-          Save Changes
-        </Button>
-      </div>
     </div>
   );
 };

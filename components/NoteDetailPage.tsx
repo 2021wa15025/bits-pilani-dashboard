@@ -9,6 +9,8 @@ import { Separator } from "./ui/separator";
 import { toast } from "sonner";
 import { copyWithFeedback, copyToClipboardSilent } from "../utils/clipboard";
 import { projectId, publicAnonKey } from "../utils/supabase/info";
+import { supabaseStorage, type SupabaseFile } from "../utils/supabase/storage";
+import { localFileStorage, type LocalFile } from "../utils/localFileStorage";
 
 interface UploadedFile {
   id: string;
@@ -39,33 +41,55 @@ interface NoteDetailPageProps {
 }
 
 function NoteDetailPage({ note, onBack, onEdit, onToggleFavorite }: NoteDetailPageProps) {
-  const [selectedFile, setSelectedFile] = useState<UploadedFile | null>(null);
+  const [selectedFile, setSelectedFile] = useState<(SupabaseFile | LocalFile) | null>(null);
   const [imageGalleryIndex, setImageGalleryIndex] = useState(0);
   const [zoom, setZoom] = useState(100);
   const [rotation, setRotation] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [files, setFiles] = useState<UploadedFile[]>(note.files || []);
+  const [files, setFiles] = useState<(SupabaseFile | LocalFile)[]>([]);
   const [isLoadingFiles, setIsLoadingFiles] = useState(false);
 
-  // Load files from server
+  // Load files from both Supabase Storage and Local Storage
   useEffect(() => {
     const loadFiles = async () => {
       if (note.id && note.id !== 'new') {
         setIsLoadingFiles(true);
         try {
-          const response = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-917daa5d/files/${note.id}`, {
-            headers: {
-              'Authorization': `Bearer ${publicAnonKey}`
-            }
-          });
+          console.log('Loading files for note ID:', note.id);
           
-          if (response.ok) {
-            const result = await response.json();
-            setFiles(result.files || []);
+          const allFiles: (SupabaseFile | LocalFile)[] = [];
+          
+          // Try to load from Supabase Storage first
+          try {
+            console.log('Checking Supabase storage...');
+            const isAccessible = await supabaseStorage.checkConnection();
+            console.log('Supabase storage accessible:', isAccessible);
+            
+            if (isAccessible) {
+              const supabaseFiles = await supabaseStorage.listFiles(note.id);
+              console.log('Files loaded from Supabase:', supabaseFiles.length, 'files');
+              allFiles.push(...supabaseFiles);
+            }
+          } catch (supabaseError) {
+            console.warn('Failed to load from Supabase storage:', supabaseError);
           }
+          
+          // Always try to load from local storage as backup/additional storage
+          try {
+            console.log('Loading files from local storage...');
+            const localFiles = localFileStorage.getFiles(note.id);
+            console.log('Files loaded from local storage:', localFiles.length, 'files');
+            allFiles.push(...localFiles);
+          } catch (localError) {
+            console.warn('Failed to load from local storage:', localError);
+          }
+          
+          console.log('Total files loaded:', allFiles.length);
+          setFiles(allFiles);
         } catch (error) {
           console.error('Error loading files:', error);
+          setFiles([]);
         } finally {
           setIsLoadingFiles(false);
         }
@@ -95,12 +119,24 @@ function NoteDetailPage({ note, onBack, onEdit, onToggleFavorite }: NoteDetailPa
     return <File className="w-5 h-5" />;
   };
 
-  const handleDownload = (file: UploadedFile) => {
-    const link = document.createElement('a');
-    link.href = file.url;
-    link.download = file.name;
-    link.click();
-    toast.success(`Downloaded ${file.name}`);
+  const handleDownload = (file: SupabaseFile | LocalFile) => {
+    try {
+      // Check if it's a local file
+      if (file.id.startsWith('local_')) {
+        localFileStorage.downloadFile(file as LocalFile);
+        toast.success(`Downloaded ${file.name}`);
+      } else {
+        // Supabase file - use traditional download method
+        const link = document.createElement('a');
+        link.href = file.url;
+        link.download = file.name;
+        link.click();
+        toast.success(`Downloaded ${file.name}`);
+      }
+    } catch (error) {
+      console.error('Error downloading file:', error);
+      toast.error('Failed to download file');
+    }
   };
 
   const handleCopyContent = async () => {
@@ -210,8 +246,8 @@ function NoteDetailPage({ note, onBack, onEdit, onToggleFavorite }: NoteDetailPa
     <div className="min-h-screen bg-background">
       <div className="max-w-5xl mx-auto">
         {/* Header */}
-        <div className="bg-card border-b border-border px-6 py-4">
-          <div className="flex items-center justify-between">
+        <div className="bg-white border-b border-border px-6 py-4 fixed top-20 left-0 right-0 z-50 shadow-sm">
+          <div className="max-w-5xl mx-auto flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Button 
                 variant="ghost" 
@@ -233,7 +269,7 @@ function NoteDetailPage({ note, onBack, onEdit, onToggleFavorite }: NoteDetailPa
         </div>
 
         {/* Content */}
-        <div className="p-6 space-y-6">
+        <div className="p-6 space-y-6" style={{ paddingTop: '180px' }}>
           {/* Note Header */}
           <div>
             <h1 className="text-3xl font-bold text-university-primary mb-4">{note.title}</h1>

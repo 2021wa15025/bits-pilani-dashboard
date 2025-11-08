@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
+import { UserProfile } from "../utils/supabase/database";
 
 interface LoginHistory {
   date: string;
@@ -16,20 +17,14 @@ interface LoginHistory {
   location: string;
 }
 
-interface UserProfile {
-  name: string;
-  id: string;
-  email: string;
-  phone: string;
-  course: string;
-  semester: string;
-  avatar: string;
+// Extended profile interface for form data
+interface ExtendedUserProfile extends UserProfile {
   campus?: string;
   academicYear?: string;
+  admissionYear?: string;
   dateOfBirth?: string;
   address?: string;
   emergencyContact?: string;
-  admissionYear?: string;
 }
 
 interface ProfileEditDialogProps {
@@ -40,7 +35,7 @@ interface ProfileEditDialogProps {
 }
 
 export function ProfileEditDialog({ isOpen, onClose, userProfile, onSave }: ProfileEditDialogProps) {
-  const [formData, setFormData] = useState<UserProfile>(userProfile);
+  const [formData, setFormData] = useState<ExtendedUserProfile>(userProfile);
   const [isLoading, setIsLoading] = useState(false);
   const [uploadError, setUploadError] = useState<string>("");
   const [isUploading, setIsUploading] = useState(false);
@@ -85,12 +80,12 @@ export function ProfileEditDialog({ isOpen, onClose, userProfile, onSave }: Prof
   useEffect(() => {
     setFormData({
       ...userProfile,
-      campus: userProfile.campus || 'BITS Pilani',
-      academicYear: userProfile.academicYear || '2024-25',
-      admissionYear: userProfile.admissionYear || '2021',
-      dateOfBirth: userProfile.dateOfBirth || '',
-      address: userProfile.address || '',
-      emergencyContact: userProfile.emergencyContact || ''
+      campus: 'BITS Pilani',
+      academicYear: '2024-25',
+      admissionYear: '2021',
+      dateOfBirth: '',
+      address: '',
+      emergencyContact: ''
     });
   }, [userProfile]);
 
@@ -103,7 +98,7 @@ export function ProfileEditDialog({ isOpen, onClose, userProfile, onSave }: Prof
     }
   }, [isOpen]);
 
-  const handleInputChange = (field: keyof UserProfile, value: string) => {
+  const handleInputChange = (field: keyof ExtendedUserProfile, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -112,7 +107,19 @@ export function ProfileEditDialog({ isOpen, onClose, userProfile, onSave }: Prof
     console.log("Saving profile data:", formData);
     // Simulate API call
     await new Promise(resolve => setTimeout(resolve, 1000));
-    onSave(formData);
+    
+    // Convert extended profile back to UserProfile for saving
+    const userProfileData: UserProfile = {
+      id: formData.id,
+      student_id: formData.student_id,
+      name: formData.name,
+      email: formData.email,
+      phone: formData.phone,
+      course: formData.course,
+      semester: formData.semester,
+      avatar: formData.avatar
+    };
+    onSave(userProfileData);
     setIsLoading(false);
   };
 
@@ -151,7 +158,19 @@ export function ProfileEditDialog({ isOpen, onClose, userProfile, onSave }: Prof
         
         // Auto-save the profile picture immediately
         console.log("Auto-saving profile with new avatar:", updatedFormData);
-        onSave(updatedFormData);
+        
+        // Convert to UserProfile format for saving
+        const userProfileData: UserProfile = {
+          id: updatedFormData.id,
+          student_id: updatedFormData.student_id,
+          name: updatedFormData.name,
+          email: updatedFormData.email,
+          phone: updatedFormData.phone,
+          course: updatedFormData.course,
+          semester: updatedFormData.semester,
+          avatar: updatedFormData.avatar
+        };
+        onSave(userProfileData);
         
         // Show success message for 3 seconds
         setShowSuccessMessage(true);

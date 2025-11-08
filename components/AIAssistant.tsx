@@ -738,13 +738,13 @@ Could you try rephrasing your question using one of these formats? I'm here to h
         >
           <Button
             onClick={() => setIsExpanded(!isExpanded)}
-            className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-university-primary hover:bg-university-secondary shadow-lg transition-all duration-300 relative"
+            className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-university-primary hover:bg-university-secondary shadow-lg transition-all duration-300 relative text-white"
           >
             {isExpanded ? (
-              <X className="w-5 h-5 sm:w-6 sm:h-6" />
+              <X className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
             ) : (
               <>
-                <Bot className="w-5 h-5 sm:w-6 sm:h-6" />
+                <Bot className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                 <div className="absolute top-1.5 right-1.5 sm:top-2 sm:right-2 w-2.5 h-2.5 sm:w-3 sm:h-3 bg-green-400 rounded-full animate-pulse border-2 border-white"></div>
                 <Badge className="absolute -top-0.5 -right-0.5 sm:-top-1 sm:-right-1 w-4 h-4 sm:w-5 sm:h-5 p-0 bg-green-500 text-white text-xs flex items-center justify-center rounded-full">
                   AI

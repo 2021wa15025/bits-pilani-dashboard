@@ -21,7 +21,7 @@ function DialogTrigger({
 function DialogPortal({
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Portal>) {
-  return <DialogPrimitive.Portal data-slot="dialog-portal" {...props} />;
+  return <DialogPrimitive.Portal data-slot="dialog-portal" container={document.body} {...props} />;
 }
 
 function DialogClose({
@@ -37,8 +37,9 @@ const DialogOverlay = React.forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     data-slot="dialog-overlay"
+    style={{ zIndex: 99998, position: 'fixed' }}
     className={cn(
-      "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm",
+      "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-[9998] bg-black/80 backdrop-blur-sm",
       className,
     )}
     {...props}
@@ -55,15 +56,16 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       data-slot="dialog-content"
+      style={{ zIndex: 99999, position: 'fixed' }}
       className={cn(
-        "bg-background border-border data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-[101] grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border bg-white dark:bg-gray-900 p-6 shadow-2xl duration-200 sm:max-w-lg",
+        "bg-background border-border data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-[9999] grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border bg-white dark:bg-gray-900 p-6 shadow-2xl duration-200 sm:max-w-lg",
         className,
       )}
       {...props}
     >
       {children}
-      <DialogPrimitive.Close className="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-4 right-4 rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4">
-        <XIcon />
+      <DialogPrimitive.Close className="ring-offset-background focus:ring-ring absolute top-2 right-2 rounded-full opacity-90 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none z-[100000] bg-white hover:bg-gray-100 shadow-lg border border-gray-200 p-2 w-8 h-8 flex items-center justify-center">
+        <XIcon className="h-4 w-4 text-gray-600" />
         <span className="sr-only">Close</span>
       </DialogPrimitive.Close>
     </DialogPrimitive.Content>

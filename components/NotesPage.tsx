@@ -93,7 +93,7 @@ function NoteCard({
       
       {/* Title Section - Tight Spacing */}
       <div className="px-5 pb-3 flex-shrink-0">
-        <h3 className="text-university-primary font-semibold leading-tight line-clamp-2 group-hover:text-primary transition-colors text-center font-bold font-normal underline text-[14px]">
+        <h3 className="text-university-primary font-semibold leading-tight line-clamp-2 group-hover:text-primary transition-colors text-center underline text-[14px]">
           {note.title}
         </h3>
       </div>
@@ -172,6 +172,10 @@ function NotesPage({ courses, notes: propNotes, onNoteClick, onNotesChange }: No
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCourse, setSelectedCourse] = useState("all");
   const [selectedTag, setSelectedTag] = useState("all");
+  const [courseSuggestions, setCourseSuggestions] = useState<string[]>([]);
+  const [showCourseSuggestions, setShowCourseSuggestions] = useState(false);
+  const [editCourseSuggestions, setEditCourseSuggestions] = useState<string[]>([]);
+  const [showEditCourseSuggestions, setShowEditCourseSuggestions] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingNote, setEditingNote] = useState<Note | null>(null);
   const [uploadingFiles, setUploadingFiles] = useState<File[]>([]);
@@ -348,6 +352,48 @@ function NotesPage({ courses, notes: propNotes, onNoteClick, onNotesChange }: No
 
   // Get all unique courses from notes
   const availableCourses = Array.from(new Set(notes.map(note => note.course))).sort();
+
+  // Helper function to filter course suggestions
+  const filterCourseSuggestions = (input: string) => {
+    if (!input.trim()) return [];
+    return courses
+      .map(course => course.title)
+      .filter(title => title.toLowerCase().includes(input.toLowerCase()))
+      .sort()
+      .slice(0, 8); // Limit to 8 suggestions
+  };
+
+  // Handle course input change with suggestions
+  const handleCourseInputChange = (value: string) => {
+    setNewNote({...newNote, course: value});
+    const suggestions = filterCourseSuggestions(value);
+    setCourseSuggestions(suggestions);
+    setShowCourseSuggestions(suggestions.length > 0 && value.trim().length > 0);
+  };
+
+  // Handle edit course input change with suggestions
+  const handleEditCourseInputChange = (value: string) => {
+    if (editingNote) {
+      setEditingNote({...editingNote, course: value});
+      const suggestions = filterCourseSuggestions(value);
+      setEditCourseSuggestions(suggestions);
+      setShowEditCourseSuggestions(suggestions.length > 0 && value.trim().length > 0);
+    }
+  };
+
+  // Select course suggestion
+  const selectCourseSuggestion = (courseTitle: string) => {
+    setNewNote({...newNote, course: courseTitle});
+    setShowCourseSuggestions(false);
+  };
+
+  // Select edit course suggestion
+  const selectEditCourseSuggestion = (courseTitle: string) => {
+    if (editingNote) {
+      setEditingNote({...editingNote, course: courseTitle});
+      setShowEditCourseSuggestions(false);
+    }
+  };
 
   const filteredNotes = notes.filter(note => {
     const matchesSearch = note.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -544,7 +590,7 @@ function NotesPage({ courses, notes: propNotes, onNoteClick, onNotesChange }: No
                 New Note
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[600px]">
+            <DialogContent className="sm:max-w-[600px] z-[9999]">
               <DialogHeader>
                 <DialogTitle className="text-lg">Create New Note</DialogTitle>
                 <DialogDescription className="text-sm">
@@ -552,22 +598,39 @@ function NotesPage({ courses, notes: propNotes, onNoteClick, onNotesChange }: No
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4">
-                <div>
+                <div className="relative">
                   <Label htmlFor="course" className="text-xs font-medium">Course *</Label>
-                  <Select value={newNote.course} onValueChange={(value) => setNewNote({...newNote, course: value})}>
-                    <SelectTrigger className={`text-xs ${!newNote.course.trim() ? "border-red-300" : ""}`}>
-                      <SelectValue placeholder="Select a course" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {courses
-                        .sort((a, b) => a.title.localeCompare(b.title))
-                        .map(course => (
-                          <SelectItem key={course.id} value={course.title} className="text-xs">
-                            {course.title}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
+                  <Input
+                    id="course"
+                    placeholder="Type course name..."
+                    value={newNote.course}
+                    onChange={(e) => handleCourseInputChange(e.target.value)}
+                    onFocus={() => {
+                      if (newNote.course.trim()) {
+                        const suggestions = filterCourseSuggestions(newNote.course);
+                        setCourseSuggestions(suggestions);
+                        setShowCourseSuggestions(suggestions.length > 0);
+                      }
+                    }}
+                    onBlur={() => {
+                      // Delay hiding suggestions to allow clicking on them
+                      setTimeout(() => setShowCourseSuggestions(false), 150);
+                    }}
+                    className={`text-xs ${!newNote.course.trim() ? "border-red-300" : ""}`}
+                  />
+                  {showCourseSuggestions && courseSuggestions.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 z-50 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto mt-1">
+                      {courseSuggestions.map((courseTitle, index) => (
+                        <div
+                          key={index}
+                          className="px-3 py-2 text-xs hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
+                          onClick={() => selectCourseSuggestion(courseTitle)}
+                        >
+                          {courseTitle}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <Label htmlFor="title" className="text-xs font-medium">Title *</Label>
@@ -597,7 +660,7 @@ function NotesPage({ courses, notes: propNotes, onNoteClick, onNotesChange }: No
                     onChange={(e) => setNewNote({...newNote, content: e.target.value})}
                     placeholder="Write your note content here..."
                     rows={10}
-                    className={`text-xs text-xs h-40 resize-none overflow-y-auto min-h-[10rem] max-h-[10rem] ${!newNote.content.trim() ? "border-red-300" : ""}`}
+                    className={`text-xs h-40 resize-none overflow-y-auto min-h-[10rem] max-h-[10rem] ${!newNote.content.trim() ? "border-red-300" : ""}`}
                   />
                 </div>
                 <div>
@@ -669,7 +732,7 @@ function NotesPage({ courses, notes: propNotes, onNoteClick, onNotesChange }: No
                   </Button>
                   <Button 
                     onClick={handleCreateNote} 
-                    className="bg-[#191f5f] hover:bg-[#151a4a] text-xs"
+                    className="bg-[#191f5f] hover:bg-[#151a4a] text-white text-xs"
                     disabled={!newNote.title.trim() || !newNote.content.trim() || !newNote.course.trim()}
                   >
                     Create Note
@@ -837,7 +900,7 @@ function NotesPage({ courses, notes: propNotes, onNoteClick, onNotesChange }: No
         {/* Edit Note Dialog */}
         {editingNote && (
           <Dialog open={!!editingNote} onOpenChange={() => setEditingNote(null)}>
-            <DialogContent className="sm:max-w-[600px]">
+            <DialogContent className="sm:max-w-[600px] z-[9999]">
               <DialogHeader>
                 <DialogTitle className="text-lg">Edit Note</DialogTitle>
                 <DialogDescription className="text-sm">
@@ -845,22 +908,39 @@ function NotesPage({ courses, notes: propNotes, onNoteClick, onNotesChange }: No
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4">
-                <div>
+                <div className="relative">
                   <Label htmlFor="edit-course" className="text-xs font-medium">Course *</Label>
-                  <Select value={editingNote.course} onValueChange={(value) => setEditingNote({...editingNote, course: value})}>
-                    <SelectTrigger className="text-xs">
-                      <SelectValue placeholder="Select a course" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {courses
-                        .sort((a, b) => a.title.localeCompare(b.title))
-                        .map(course => (
-                          <SelectItem key={course.id} value={course.title} className="text-xs">
-                            {course.title}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
+                  <Input
+                    id="edit-course"
+                    placeholder="Type course name..."
+                    value={editingNote.course}
+                    onChange={(e) => handleEditCourseInputChange(e.target.value)}
+                    onFocus={() => {
+                      if (editingNote.course.trim()) {
+                        const suggestions = filterCourseSuggestions(editingNote.course);
+                        setEditCourseSuggestions(suggestions);
+                        setShowEditCourseSuggestions(suggestions.length > 0);
+                      }
+                    }}
+                    onBlur={() => {
+                      // Delay hiding suggestions to allow clicking on them
+                      setTimeout(() => setShowEditCourseSuggestions(false), 150);
+                    }}
+                    className="text-xs"
+                  />
+                  {showEditCourseSuggestions && editCourseSuggestions.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 z-50 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto mt-1">
+                      {editCourseSuggestions.map((courseTitle, index) => (
+                        <div
+                          key={index}
+                          className="px-3 py-2 text-xs hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
+                          onClick={() => selectEditCourseSuggestion(courseTitle)}
+                        >
+                          {courseTitle}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <Label htmlFor="edit-title" className="text-xs font-medium">Title *</Label>
@@ -879,7 +959,7 @@ function NotesPage({ courses, notes: propNotes, onNoteClick, onNotesChange }: No
                     value={editingNote.tags}
                     onChange={(e) => setEditingNote({...editingNote, tags: e.target.value})}
                     placeholder="lecture, assignment, theory..."
-                    className="text-xs text-xs"
+                    className="text-xs"
                   />
                 </div>
                 <div>
@@ -890,7 +970,7 @@ function NotesPage({ courses, notes: propNotes, onNoteClick, onNotesChange }: No
                     onChange={(e) => setEditingNote({...editingNote, content: e.target.value})}
                     placeholder="Write your note content here..."
                     rows={10}
-                    className="text-xs text-xs h-40 resize-none overflow-y-auto min-h-[10rem] max-h-[10rem]"
+                    className="text-xs h-40 resize-none overflow-y-auto min-h-[10rem] max-h-[10rem]"
                   />
                 </div>
                 <div>
@@ -963,7 +1043,7 @@ function NotesPage({ courses, notes: propNotes, onNoteClick, onNotesChange }: No
                     </Button>
                     <Button 
                       onClick={handleEditNote} 
-                      className="bg-[#191f5f] hover:bg-[#151a4a] text-xs"
+                      className="bg-[#191f5f] hover:bg-[#151a4a] text-white text-xs"
                       disabled={!editingNote.title.trim() || !editingNote.content.trim()}
                     >
                       Save Changes
@@ -978,7 +1058,7 @@ function NotesPage({ courses, notes: propNotes, onNoteClick, onNotesChange }: No
         {/* File Preview Dialog */}
         {previewFile && (
           <Dialog open={!!previewFile} onOpenChange={() => setPreviewFile(null)}>
-            <DialogContent className="sm:max-w-[800px] max-h-[90vh]">
+            <DialogContent className="sm:max-w-[800px] max-h-[90vh] z-[9999]">
               <DialogHeader>
                 <DialogTitle className="text-lg flex items-center gap-2">
                   <span>{getFileIcon(previewFile.type)}</span>

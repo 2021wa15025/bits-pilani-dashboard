@@ -154,27 +154,51 @@ const AccessibilitySettings: React.FC = () => {
     if (newSettings.bigBlackCursor) mainContent.classList.add('main-big-black-cursor');
     if (newSettings.bigWhiteCursor) mainContent.classList.add('main-big-white-cursor');
 
-    if (newSettings.textSize === 1) {
+    // Apply text size adjustments using CSS custom properties
+    const htmlElement = document.documentElement;
+    
+    if (newSettings.textSize === 0) {
+      // Normal size (16px)
+      htmlElement.style.setProperty('--font-size', '16px');
+      mainContent.classList.remove('accessibility-text-large', 'accessibility-text-xlarge');
+    } else if (newSettings.textSize === 1) {
+      // Large size (18px)
+      htmlElement.style.setProperty('--font-size', '18px');
       mainContent.classList.add('accessibility-text-large');
+      mainContent.classList.remove('accessibility-text-xlarge');
     } else if (newSettings.textSize === 2) {
+      // Extra large size (20px)
+      htmlElement.style.setProperty('--font-size', '20px');
       mainContent.classList.add('accessibility-text-xlarge');
+      mainContent.classList.remove('accessibility-text-large');
     }
 
     if (newSettings.lineHeight > 0) {
       mainContent.classList.add('accessibility-line-height');
       const mainContentElement = mainContent as HTMLElement;
-      mainContentElement.style.setProperty('--line-height-multiplier', '1.7');
+      const lineHeightValue = newSettings.lineHeight === 1 ? '1.7' : '2.0';
+      mainContentElement.style.setProperty('--line-height-multiplier', lineHeightValue);
+    } else {
+      mainContent.classList.remove('accessibility-line-height');
+      const mainContentElement = mainContent as HTMLElement;
+      mainContentElement.style.removeProperty('--line-height-multiplier');
     }
 
     if (newSettings.textSpacing > 0) {
       mainContent.classList.add('accessibility-letter-spacing');
       const mainContentElement = mainContent as HTMLElement;
-      mainContentElement.style.setProperty('--letter-spacing-value', '0.05em');
+      const spacingValue = newSettings.textSpacing === 1 ? '0.05em' : '0.1em';
+      mainContentElement.style.setProperty('--letter-spacing-value', spacingValue);
+    } else {
+      mainContent.classList.remove('accessibility-letter-spacing');
+      const mainContentElement = mainContent as HTMLElement;
+      mainContentElement.style.removeProperty('--letter-spacing-value');
     }
   };
 
   const resetSettings = () => {
-    setSettings({
+    // Reset all settings to default
+    const defaultSettings = {
       visualImpairment: false,
       seizureEpileptic: false,
       colorVisionDeficiency: false,
@@ -204,7 +228,45 @@ const AccessibilitySettings: React.FC = () => {
       readingMask: false,
       bigBlackCursor: false,
       bigWhiteCursor: false,
-    });
+    };
+
+    // Clear localStorage
+    localStorage.removeItem('accessibilitySettings');
+    
+    // Remove all accessibility classes from main content
+    const mainContent = document.querySelector('.university-content');
+    if (mainContent) {
+      // Remove profile classes
+      mainContent.classList.remove(
+        'visual-impairment', 'seizure-epileptic', 'color-vision-deficiency',
+        'adhd', 'dyslexia', 'learning'
+      );
+      
+      // Remove content adjustment classes
+      mainContent.classList.remove(
+        'readable-font', 'dyslexia-font', 'highlight-headings',
+        'highlight-links', 'highlight-buttons', 'hide-images',
+        'show-tooltips', 'stop-animations'
+      );
+      
+      // Remove text adjustment classes
+      mainContent.classList.remove(
+        'accessibility-text-size', 'accessibility-line-height', 
+        'accessibility-letter-spacing'
+      );
+      
+      // Reset CSS custom properties
+      const mainContentElement = mainContent as HTMLElement;
+      mainContentElement.style.removeProperty('--font-size-adjustment');
+      mainContentElement.style.removeProperty('--line-height-value');
+      mainContentElement.style.removeProperty('--letter-spacing-value');
+      
+      // Reset font size to default
+      document.documentElement.style.setProperty('--font-size', '16px');
+    }
+    
+    // Update state
+    setSettings(defaultSettings);
   };
 
   const updateSetting = (key: keyof AccessibilityState, value: boolean | number) => {
@@ -243,7 +305,7 @@ const AccessibilitySettings: React.FC = () => {
               </div>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
                 {[
-                  { key: 'visualImpairment', icon: Eye, title: 'Visual Impairment', desc: 'Enhances contrast and visibility' },
+                  { key: 'visualImpairment', icon: Eye, title: 'Visual', desc: 'Enhances contrast and visibility for visual impairments' },
                   { key: 'seizureEpileptic', icon: Zap, title: 'Seizure Safe', desc: 'Removes animations and motion' },
                   { key: 'colorVisionDeficiency', icon: Palette, title: 'Color Blind', desc: 'Adjusts colors for accessibility' },
                   { key: 'adhd', icon: Focus, title: 'ADHD', desc: 'Reduces distractions' },
@@ -254,11 +316,11 @@ const AccessibilitySettings: React.FC = () => {
                     <TooltipTrigger asChild>
                       <Button
                         variant={settings[key as keyof AccessibilityState] ? "default" : "outline"}
-                        className="h-auto p-3 flex flex-col items-center gap-2 w-full"
+                        className="h-auto p-3 flex flex-col items-center gap-2 w-full min-h-[80px] text-wrap"
                         onClick={() => updateSetting(key as keyof AccessibilityState, !settings[key as keyof AccessibilityState])}
                       >
-                        <Icon className="h-5 w-5" />
-                        <span className="text-sm font-medium">{title}</span>
+                        <Icon className="h-5 w-5 flex-shrink-0" />
+                        <span className="text-xs font-medium text-center leading-tight break-words">{title}</span>
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>

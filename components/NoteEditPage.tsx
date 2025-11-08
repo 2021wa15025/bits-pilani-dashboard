@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { ArrowLeft, Save, X, Upload, FileText, Image as ImageIcon, File, Trash2, Download, Tag, BookOpen, Calendar } from "lucide-react";
+import { ArrowLeft, Save, X, Upload, FileText, Image as ImageIcon, File, Trash2, Download, Tag, BookOpen, Calendar, ChevronDown } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
@@ -13,6 +13,8 @@ import { toast } from "sonner";
 import { FileUpload } from "./FileUpload";
 import { FileManager } from "./FileManager";
 import { projectId, publicAnonKey } from "../utils/supabase/info";
+import { supabaseStorage, type SupabaseFile } from "../utils/supabase/storage";
+import { localFileStorage, type LocalFile } from "../utils/localFileStorage";
 
 interface UploadedFile {
   id: string;
@@ -21,6 +23,7 @@ interface UploadedFile {
   size: number;
   url: string;
   uploadDate: string;
+  noteId: string;
 }
 
 interface Note {
@@ -56,36 +59,68 @@ function NoteEditPage({ note, courses, onBack, onSave, onCancel }: NoteEditPageP
   const [content, setContent] = useState(note.content);
   const [selectedCourse, setSelectedCourse] = useState(note.course);
   const [tags, setTags] = useState(note.tags);
-  const [files, setFiles] = useState<UploadedFile[]>(note.files || []);
+  const [files, setFiles] = useState<(SupabaseFile | LocalFile)[]>(note.files || []);
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showDiscardDialog, setShowDiscardDialog] = useState(false);
   const [unsavedChanges, setUnsavedChanges] = useState(false);
   const [isLoadingFiles, setIsLoadingFiles] = useState(false);
   
+  // Auto-suggestion state
+  const [courseInput, setCourseInput] = useState(note.course);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [filteredCourses, setFilteredCourses] = useState<Course[]>([]);
+  const courseInputRef = useRef<HTMLInputElement>(null);
+  const suggestionsRef = useRef<HTMLDivElement>(null);
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Load existing files for the note
+  // Load files from both Supabase Storage and Local Storage
   useEffect(() => {
     const loadFiles = async () => {
       if (note.id && note.id !== 'new') {
         setIsLoadingFiles(true);
         try {
-          const response = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-917daa5d/files/${note.id}`, {
-            headers: {
-              'Authorization': `Bearer ${publicAnonKey}`
-            }
-          });
+          console.log('Loading files for note ID:', note.id);
           
-          if (response.ok) {
-            const result = await response.json();
-            setFiles(result.files || []);
+          const allFiles: (SupabaseFile | LocalFile)[] = [];
+          
+          // Try to load from Supabase Storage first
+          try {
+            console.log('Checking Supabase storage...');
+            const isAccessible = await supabaseStorage.checkConnection();
+            console.log('Supabase storage accessible:', isAccessible);
+            
+            if (isAccessible) {
+              const supabaseFiles = await supabaseStorage.listFiles(note.id);
+              console.log('Files loaded from Supabase:', supabaseFiles.length, 'files');
+              allFiles.push(...supabaseFiles);
+            }
+          } catch (supabaseError) {
+            console.warn('Failed to load from Supabase storage:', supabaseError);
           }
+          
+          // Always try to load from local storage as backup/additional storage
+          try {
+            console.log('Loading files from local storage...');
+            const localFiles = localFileStorage.getFiles(note.id);
+            console.log('Files loaded from local storage:', localFiles.length, 'files');
+            allFiles.push(...localFiles);
+          } catch (localError) {
+            console.warn('Failed to load from local storage:', localError);
+          }
+          
+          console.log('Total files loaded:', allFiles.length);
+          setFiles(allFiles);
         } catch (error) {
           console.error('Error loading files:', error);
+          setFiles([]);
         } finally {
           setIsLoadingFiles(false);
         }
+      } else {
+        console.log('No valid note ID, skipping file loading');
+        setFiles([]);
       }
     };
 
@@ -114,12 +149,12 @@ function NoteEditPage({ note, courses, onBack, onSave, onCancel }: NoteEditPageP
     return <File className="w-4 h-4" />;
   };
 
-  const handleFilesUploaded = (uploadedFiles: UploadedFile[]) => {
+  const handleFilesUploaded = (uploadedFiles: (SupabaseFile | LocalFile)[]) => {
     setFiles(prev => [...prev, ...uploadedFiles]);
     setUnsavedChanges(true);
   };
 
-  const handleFilesChange = (updatedFiles: UploadedFile[]) => {
+  const handleFilesChange = (updatedFiles: (SupabaseFile | LocalFile)[]) => {
     setFiles(updatedFiles);
     setUnsavedChanges(true);
   };
@@ -136,8 +171,8 @@ function NoteEditPage({ note, courses, onBack, onSave, onCancel }: NoteEditPageP
       return;
     }
     
-    if (!selectedCourse) {
-      toast.error("Please select a course");
+    if (!selectedCourse.trim()) {
+      toast.error("Please enter a course");
       return;
     }
     
@@ -223,12 +258,73 @@ function NoteEditPage({ note, courses, onBack, onSave, onCancel }: NoteEditPageP
     }
   };
 
+  // Auto-suggestion functions
+  const handleCourseInputChange = (value: string) => {
+    setCourseInput(value);
+    setSelectedCourse(value);
+    setUnsavedChanges(true);
+    
+    // Filter courses based on input
+    if (value.trim()) {
+      const filtered = courses.filter(course => 
+        course.title.toLowerCase().includes(value.toLowerCase()) ||
+        course.code.toLowerCase().includes(value.toLowerCase())
+      );
+      setFilteredCourses(filtered);
+      setShowSuggestions(filtered.length > 0);
+    } else {
+      setFilteredCourses([]);
+      setShowSuggestions(false);
+    }
+  };
+
+  const selectCourse = (course: Course) => {
+    setCourseInput(course.title);
+    setSelectedCourse(course.title);
+    setShowSuggestions(false);
+    setUnsavedChanges(true);
+  };
+
+  const handleCourseInputFocus = () => {
+    if (courseInput.trim() && filteredCourses.length > 0) {
+      setShowSuggestions(true);
+    }
+  };
+
+  const handleCourseInputBlur = (e: React.FocusEvent) => {
+    // Delay hiding suggestions to allow for clicks on suggestions
+    setTimeout(() => {
+      if (!suggestionsRef.current?.contains(e.relatedTarget as Node)) {
+        setShowSuggestions(false);
+      }
+    }, 150);
+  };
+
+  // Close suggestions when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        courseInputRef.current &&
+        !courseInputRef.current.contains(event.target as Node) &&
+        suggestionsRef.current &&
+        !suggestionsRef.current.contains(event.target as Node)
+      ) {
+        setShowSuggestions(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-5xl mx-auto">
         {/* Header */}
-        <div className="bg-card border-b border-border px-6 py-4">
-          <div className="flex items-center justify-between">
+        <div className="bg-white border-b border-border px-6 py-4 fixed top-20 left-0 right-0 z-50 shadow-sm">
+          <div className="max-w-5xl mx-auto flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Button 
                 variant="ghost" 
@@ -257,7 +353,7 @@ function NoteEditPage({ note, courses, onBack, onSave, onCancel }: NoteEditPageP
                 variant="outline" 
                 onClick={handleCancel}
                 disabled={isSaving}
-                className="text-xs"
+                className="text-xs border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
               >
                 <X className="w-3 h-3 mr-1" />
                 Cancel
@@ -265,7 +361,7 @@ function NoteEditPage({ note, courses, onBack, onSave, onCancel }: NoteEditPageP
               <Button 
                 onClick={handleSave}
                 disabled={isSaving || !title.trim() || !content.trim()}
-                className="text-xs bg-primary hover:bg-primary/90"
+                className="text-xs bg-[#191f5e] hover:bg-[#151a4a] text-white"
               >
                 {isSaving ? (
                   <>
@@ -284,7 +380,7 @@ function NoteEditPage({ note, courses, onBack, onSave, onCancel }: NoteEditPageP
         </div>
 
         {/* Content */}
-        <div className="p-6 space-y-6">
+        <div className="p-6 space-y-6" style={{ paddingTop: '180px' }}>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Main Edit Area */}
             <div className="lg:col-span-2 space-y-6">
@@ -374,21 +470,37 @@ function NoteEditPage({ note, courses, onBack, onSave, onCancel }: NoteEditPageP
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <Select value={selectedCourse} onValueChange={handleCourseChange}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a course" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {courses.map((course) => (
-                        <SelectItem key={course.id} value={course.title}>
-                          <div>
+                  <div className="relative">
+                    <Input
+                      ref={courseInputRef}
+                      value={courseInput}
+                      onChange={(e) => handleCourseInputChange(e.target.value)}
+                      onFocus={handleCourseInputFocus}
+                      onBlur={handleCourseInputBlur}
+                      placeholder="Type to search courses..."
+                      className="pr-8"
+                    />
+                    <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                    
+                    {/* Auto-suggestion dropdown */}
+                    {showSuggestions && filteredCourses.length > 0 && (
+                      <div
+                        ref={suggestionsRef}
+                        className="absolute z-50 w-full bg-white border border-border rounded-md shadow-lg mt-1 max-h-60 overflow-y-auto"
+                      >
+                        {filteredCourses.map((course) => (
+                          <div
+                            key={course.id}
+                            className="px-3 py-2 hover:bg-accent cursor-pointer border-b border-border last:border-b-0"
+                            onClick={() => selectCourse(course)}
+                          >
                             <p className="font-medium text-card-foreground">{course.title}</p>
                             <p className="text-xs text-muted-foreground">{course.code}</p>
                           </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
 

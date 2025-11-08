@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { students } from '../data/studentsData';
+import { CrossSessionMessaging, crossSessionMessaging } from '../utils/crossSessionMessaging';
 import { 
   MessageCircle, 
   Users, 
@@ -65,24 +66,22 @@ interface ChatGroup {
 interface MessagingModalProps {
   isOpen: boolean;
   onClose: () => void;
+  currentUser: {
+    id: string;
+    name: string;
+    email: string;
+    avatar?: string;
+  };
 }
 
-export default function MessagingModal({ isOpen, onClose }: MessagingModalProps) {
+export default function MessagingModal({ isOpen, onClose, currentUser }: MessagingModalProps) {
   const [activeTab, setActiveTab] = useState<'chats' | 'groups'>('chats');
   const [selectedChat, setSelectedChat] = useState<string | null>(null);
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
   const [showNewChat, setShowNewChat] = useState(false);
   const [showNewGroup, setShowNewGroup] = useState(false);
   
-  // Current user (you would get this from context/auth)
-  const currentUser = {
-    id: 'current-user',
-    name: 'You',
-    email: 'you@wilp.bits-pilani.ac.in',
-    avatar: ''
-  };
-  
-  // State for messaging
+  // State for messaging - using cross-session messaging
   const [privateChats, setPrivateChats] = useState<PrivateChat[]>([]);
   const [groups, setGroups] = useState<ChatGroup[]>([]);
   const [messages, setMessages] = useState<{ [key: string]: Message[] }>({});
@@ -97,44 +96,126 @@ export default function MessagingModal({ isOpen, onClose }: MessagingModalProps)
   // File upload state
   const [fileUpload, setFileUpload] = useState<{ file: File | null; preview?: string }>({ file: null });
   
+  // Initialize the cross-session messaging instance
+  const [crossSessionMessaging] = useState(() => new CrossSessionMessaging());
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  // Five students list for the website
-  // Get available students from centralized data
-  const [availableStudents] = useState(
-    students.map(student => ({
-      id: student.id,
-      name: student.name,
-      email: student.email,
-      avatar: student.avatar || '',
-      isOnline: student.isOnline || false
-    }))
-  );
+  // State for available students (excluding current user)
+  const [availableStudents, setAvailableStudents] = useState<typeof students>([]);
 
-  // Load data from localStorage
+  // Update available students when currentUser changes
   useEffect(() => {
-    const savedChats = localStorage.getItem('privateChats');
-    const savedGroups = localStorage.getItem('chatGroups');
-    const savedMessages = localStorage.getItem('chatMessages');
+    if (currentUser?.id) {
+      const filteredStudents = students.filter(student => student.id !== currentUser.id).map(student => ({
+        id: student.id,
+        name: student.name,
+        username: student.username,
+        email: student.email,
+        password: student.password,
+        phone: student.phone,
+        course: student.course,
+        semester: student.semester,
+        avatar: student.avatar || '',
+        isOnline: student.isOnline || false
+      }));
+      setAvailableStudents(filteredStudents);
+    }
+  }, [currentUser?.id]);
+
+  // Load data from cross-session messaging
+  useEffect(() => {
+    if (!currentUser?.id) return;
     
-    if (savedChats) setPrivateChats(JSON.parse(savedChats));
-    if (savedGroups) setGroups(JSON.parse(savedGroups));
-    if (savedMessages) setMessages(JSON.parse(savedMessages));
-  }, []);
+    // Load recent chats from localStorage
+    const loadChats = () => {
+      console.log('🔄 Loading chats for user:', currentUser.id);
+      const recentChats = crossSessionMessaging.getRecentChats(currentUser.id);
+      console.log('📋 Loaded recent chats:', recentChats);
+      
+      // Convert to expected format
+      const formattedChats = recentChats.map(chat => ({
+        ...chat,
+        lastMessage: chat.lastMessage ? {
+          ...chat.lastMessage,
+          type: chat.lastMessage.type as 'text' | 'file' | 'system'
+        } : undefined
+      }));
+      
+      setPrivateChats(formattedChats);
+    };
+    
+    // Load groups from Supabase
+    const loadGroups = async () => {
+      console.log('🔄 Loading groups for user:', currentUser.id);
+      const allGroups = await crossSessionMessaging.getGroups();
+      console.log('👥 Loaded all groups:', allGroups);
+      setGroups(allGroups);
+    };
+    
+    loadChats();
+    loadGroups();
+    
+    // Listen for new messages
+    const unsubscribe = crossSessionMessaging.onMessage(async (allMessages) => {
+      console.log('📡 Received real-time message update');
+      await loadChats(); // Reload chats when messages change
+      await loadGroups(); // Reload groups when messages change
+      
+      // If we have a selected chat, reload its messages
+      if (selectedChat) {
+        const chatMessages = await crossSessionMessaging.getMessages(currentUser.id, selectedChat);
+        setMessages(prev => ({
+          ...prev,
+          [selectedChat]: chatMessages
+        }));
+      }
+      
+      // If we have a selected group, reload its messages
+      if (selectedGroup) {
+        const groupMessages = await crossSessionMessaging.getGroupMessages(selectedGroup);
+        setMessages(prev => ({
+          ...prev,
+          [`group_${selectedGroup}`]: groupMessages
+        }));
+      }
+    });
+    
+    return unsubscribe;
+  }, [currentUser?.id, selectedChat]);
 
-  // Save data to localStorage
+  // Load messages for selected chat or group
   useEffect(() => {
-    localStorage.setItem('privateChats', JSON.stringify(privateChats));
-  }, [privateChats]);
+    if (selectedChat && currentUser?.id) {
+      const chatMessages = crossSessionMessaging.getMessages(currentUser.id, selectedChat);
+        setMessages(prev => ({
+          ...prev,
+          [selectedChat]: chatMessages
+        }));
+    }
+    
+    if (selectedGroup) {
+      const groupMessages = crossSessionMessaging.getGroupMessages(selectedGroup);
+      setMessages(prev => ({
+        ...prev,
+        [`group_${selectedGroup}`]: groupMessages
+      });
+  }, [selectedChat, selectedGroup, currentUser?.id]);
 
-  useEffect(() => {
-    localStorage.setItem('chatGroups', JSON.stringify(groups));
-  }, [groups]);
+  // Get current messages for display
+  const currentMessages = selectedChat 
+    ? messages[selectedChat] || []
+    : selectedGroup 
+    ? messages[`group_${selectedGroup}`] || []
+    : [];
 
+  // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
-    localStorage.setItem('chatMessages', JSON.stringify(messages));
-  }, [messages]);
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [currentMessages]);
 
   const filteredStudents = availableStudents.filter(student =>
     student.name.toLowerCase().includes(memberSearch.toLowerCase()) ||
@@ -184,59 +265,44 @@ export default function MessagingModal({ isOpen, onClose }: MessagingModalProps)
     }
   };
 
-  const handleCreateGroup = () => {
+  const handleCreateGroup = async () => {
     if (!newGroupName.trim()) return;
 
-    const newGroup: ChatGroup = {
-      id: Date.now().toString(),
+    const groupData = {
       name: newGroupName,
       description: newGroupDescription,
       members: [
         {
           id: currentUser.id,
           name: currentUser.name,
-          email: currentUser.email,
-          avatar: currentUser.avatar,
-          role: 'admin'
+          role: 'admin' as const
         },
         ...selectedMembers.map(memberId => {
           const student = availableStudents.find(s => s.id === memberId)!;
           return {
             id: student.id,
             name: student.name,
-            email: student.email,
-            avatar: student.avatar,
             role: 'member' as const
           };
         })
       ],
-      unreadCount: 0,
-      createdAt: new Date().toISOString(),
       createdBy: currentUser.id
     };
 
-    setGroups(prev => [...prev, newGroup]);
+    // Use Supabase cross-session messaging for group creation
+    const success = await crossSessionMessaging.createGroup(groupData);
     
-    // Add system message
-    const systemMessage: Message = {
-      id: Date.now().toString(),
-      senderId: 'system',
-      senderName: 'System',
-      content: `${currentUser.name} created the group "${newGroupName}"`,
-      timestamp: new Date().toISOString(),
-      type: 'system'
-    };
-    
-    setMessages(prev => ({
-      ...prev,
-      [`group_${newGroup.id}`]: [systemMessage]
-    }));
-
-    // Reset form
-    setNewGroupName('');
-    setNewGroupDescription('');
-    setSelectedMembers([]);
-    setShowNewGroup(false);
+    if (success) {
+      // Reset form
+      setNewGroupName('');
+      setNewGroupDescription('');
+      setSelectedMembers([]);
+      setShowNewGroup(false);
+      
+      // Reload groups to show the new one
+      const allGroups = await crossSessionMessaging.getGroups();
+      setGroups(allGroups);
+    }
   };
 
   const handleStartPrivateChat = (studentId: string) => {
@@ -246,13 +312,14 @@ export default function MessagingModal({ isOpen, onClose }: MessagingModalProps)
     // Check if chat already exists
     const existingChat = privateChats.find(chat => chat.participantId === studentId);
     if (existingChat) {
-      setSelectedChat(existingChat.id);
+      setSelectedChat(studentId); // Use student ID directly
       setShowNewChat(false);
       return;
     }
 
+    // Create new chat entry for UI
     const newChat: PrivateChat = {
-      id: Date.now().toString(),
+      id: studentId, // Use student ID as chat ID for simplicity
       participantId: studentId,
       participantName: student.name,
       participantEmail: student.email,
@@ -261,48 +328,80 @@ export default function MessagingModal({ isOpen, onClose }: MessagingModalProps)
     };
 
     setPrivateChats(prev => [...prev, newChat]);
-    setSelectedChat(newChat.id);
+    setSelectedChat(studentId); // Use student ID directly
     setShowNewChat(false);
   };
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!newMessage.trim() && !fileUpload.file) return;
+    if (!selectedChat && !selectedGroup) return;
 
-    const message: Message = {
-      id: Date.now().toString(),
-      senderId: currentUser.id,
-      senderName: currentUser.name,
-      senderAvatar: currentUser.avatar,
-      content: newMessage,
-      timestamp: new Date().toISOString(),
-      type: fileUpload.file ? 'file' : 'text',
-      ...(fileUpload.file && {
-        fileAttachment: {
-          name: fileUpload.file.name,
-          size: fileUpload.file.size,
-          type: fileUpload.file.type,
-          url: fileUpload.preview || '#'
-        }
-      })
-    };
+    if (selectedChat) {
+      // Send private message using Supabase cross-session messaging
+      const messageData = {
+        content: newMessage,
+        type: (fileUpload.file ? 'file' : 'text') as 'text' | 'file',
+        ...(fileUpload.file && {
+          fileAttachment: {
+            name: fileUpload.file.name,
+            size: fileUpload.file.size,
+            type: fileUpload.file.type,
+            url: fileUpload.preview || '#'
+          }
+        })
+      };
 
-    const chatKey = selectedChat ? `chat_${selectedChat}` : selectedGroup ? `group_${selectedGroup}` : '';
-    if (!chatKey) return;
+      const success = await crossSessionMessaging.sendMessage(currentUser.id, selectedChat, messageData);
+      
+      if (success) {
+        setNewMessage('');
+        setFileUpload({ file: null });
+        
+        // Immediately reload messages for this chat
+        const updatedMessages = await crossSessionMessaging.getMessages(currentUser.id, selectedChat);
+        setMessages(prev => ({
+          ...prev,
+          [selectedChat]: updatedMessages
+        }));
+      } else {
+        console.error('❌ Failed to send message');
+        // Show user feedback - you can replace this with a toast notification
+        alert('Failed to send message. Please check the console for details.');
+      }
+    } else if (selectedGroup) {
+      // Send group message using Supabase cross-session messaging
+      const messageData = {
+        content: newMessage,
+        type: (fileUpload.file ? 'file' : 'text') as 'text' | 'file',
+        ...(fileUpload.file && {
+          fileAttachment: {
+            name: fileUpload.file.name,
+            size: fileUpload.file.size,
+            type: fileUpload.file.type,
+            url: fileUpload.preview || '#'
+          }
+        })
+      };
 
-    setMessages(prev => ({
-      ...prev,
-      [chatKey]: [...(prev[chatKey] || []), message]
-    }));
-
-    setNewMessage('');
-    setFileUpload({ file: null });
+      const success = await crossSessionMessaging.sendGroupMessage(currentUser.id, selectedGroup, messageData);
+      
+      if (success) {
+        setNewMessage('');
+        setFileUpload({ file: null });
+        
+        // Immediately reload messages for this group
+        const updatedMessages = await crossSessionMessaging.getGroupMessages(selectedGroup);
+        setMessages(prev => ({
+          ...prev,
+          [`group_${selectedGroup}`]: updatedMessages
+        }));
+      } else {
+        console.error('❌ Failed to send group message');
+        // Show user feedback - you can replace this with a toast notification
+        alert('Failed to send group message. Please check the console for details.');
+      }
+    }
   };
-
-  const currentMessages = selectedChat 
-    ? messages[`chat_${selectedChat}`] || []
-    : selectedGroup 
-    ? messages[`group_${selectedGroup}`] || []
-    : [];
 
   const currentChatName = selectedChat
     ? privateChats.find(chat => chat.id === selectedChat)?.participantName
@@ -436,8 +535,8 @@ export default function MessagingModal({ isOpen, onClose }: MessagingModalProps)
   if (selectedChat || selectedGroup) {
     return (
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="max-w-2xl h-[500px] flex flex-col">
-          <DialogHeader>
+        <DialogContent className="max-w-2xl h-[600px] flex flex-col overflow-hidden">
+          <DialogHeader className="flex-shrink-0">
             <div className="flex items-center justify-between">
               <DialogTitle className="flex items-center gap-2">
                 <MessageCircle className="w-5 h-5" />
@@ -456,8 +555,9 @@ export default function MessagingModal({ isOpen, onClose }: MessagingModalProps)
             </div>
           </DialogHeader>
           
-          <div className="flex-1 flex flex-col">
-            <div className="flex-1 overflow-y-auto p-3 space-y-3 bg-gray-50 rounded-lg">
+          <div className="flex-1 flex flex-col min-h-0">
+            {/* Messages area with proper scroll */}
+            <div className="flex-1 overflow-y-auto p-3 space-y-3 bg-gray-50 rounded-lg min-h-0">
               {currentMessages.length === 0 ? (
                 <div className="text-center text-gray-500 py-8">
                   <MessageCircle className="w-12 h-12 mx-auto mb-2 opacity-50" />
@@ -512,7 +612,7 @@ export default function MessagingModal({ isOpen, onClose }: MessagingModalProps)
             
             {/* File upload preview */}
             {fileUpload.file && (
-              <div className="flex items-center gap-2 px-3 py-2 bg-gray-100 border-t">
+              <div className="flex items-center gap-2 px-3 py-2 bg-gray-100 border-t flex-shrink-0">
                 <Paperclip className="w-4 h-4 text-gray-500" />
                 <div className="flex-1">
                   <p className="text-sm font-medium">{fileUpload.file.name}</p>
@@ -529,7 +629,8 @@ export default function MessagingModal({ isOpen, onClose }: MessagingModalProps)
               </div>
             )}
             
-            <div className="flex gap-2 mt-2 items-end">
+            {/* Message input area - fixed at bottom */}
+            <div className="flex gap-2 mt-2 items-end flex-shrink-0 border-t pt-3">
               <Button 
                 size="sm" 
                 variant="ghost" 
@@ -577,7 +678,7 @@ export default function MessagingModal({ isOpen, onClose }: MessagingModalProps)
           </DialogTitle>
         </DialogHeader>
         
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 overflow-hidden min-h-0">
           <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'chats' | 'groups')} className="h-full flex flex-col">
             <div className="flex items-center justify-between mb-4 flex-shrink-0">
               <TabsList>
@@ -607,8 +708,8 @@ export default function MessagingModal({ isOpen, onClose }: MessagingModalProps)
               </div>
             </div>
             
-            <div className="flex-1 overflow-y-auto">
-              <TabsContent value="chats" className="h-full space-y-2 mt-0">
+            <div className="flex-1 overflow-y-auto min-h-0">
+              <TabsContent value="chats" className="h-full space-y-2 mt-0 overflow-y-auto">
             {privateChats.length === 0 ? (
               <div className="text-center py-8">
                 <MessageCircle className="w-16 h-16 mx-auto mb-4 opacity-50" />
@@ -677,7 +778,7 @@ export default function MessagingModal({ isOpen, onClose }: MessagingModalProps)
             )}
           </TabsContent>
           
-          <TabsContent value="groups" className="h-full space-y-2 mt-0">
+          <TabsContent value="groups" className="h-full space-y-2 mt-0 overflow-y-auto">
             {groups.length === 0 ? (
               <div className="text-center py-8">
                 <Users className="w-16 h-16 mx-auto mb-4 opacity-50" />

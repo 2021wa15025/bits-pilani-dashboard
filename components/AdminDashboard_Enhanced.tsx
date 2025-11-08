@@ -14,6 +14,7 @@ import {
   Calendar, Clock, MapPin, Ticket
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./ui/dialog";
+import { students as defaultStudents, Student } from '../data/studentsData';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
 import { coursesData } from '../data/coursesData';
 import { AdminCourseDetailsPage } from './AdminCourseDetailsPage';
@@ -43,15 +44,6 @@ interface Event {
   createdAt?: string;
 }
 
-interface Student {
-  id: string;
-  username: string;
-  password: string;
-  name: string;
-  email: string;
-  phone: string;
-  course: string;
-}
 
 interface Admin {
   id: string;
@@ -82,55 +74,9 @@ export function AdminDashboard({ onLogout, adminUsername }: AdminDashboardProps)
   const [activeTab, setActiveTab] = useState("announcements");
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
-  const [students, setStudents] = useState<Student[]>([
-    {
-      id: "2021wa15025",
-      name: "HARI HARA SUDHAN",
-      username: "2021wa15025@wilp.bits-pilani.ac.in",
-      email: "2021wa15025@wilp.bits-pilani.ac.in",
-      password: "student123",
-      phone: "+91 9876543225",
-      course: "M.Tech Software Systems"
-    },
-    {
-      id: "2021wa15026",
-      name: "Priya Patel", 
-      username: "2021wa15026@wilp.bits-pilani.ac.in",
-      email: "2021wa15026@wilp.bits-pilani.ac.in",
-      password: "student123",
-      phone: "+91 9876543226",
-      course: "M.Tech Software Systems"
-    },
-    {
-      id: "2021wa15027",
-      name: "Arjun Gupta",
-      username: "2021wa15027@wilp.bits-pilani.ac.in",
-      email: "2021wa15027@wilp.bits-pilani.ac.in",
-      password: "student123", 
-      phone: "+91 9876543227",
-      course: "M.Tech Software Systems"
-    },
-    {
-      id: "2021wa15028",
-      name: "Sneha Singh",
-      username: "2021wa15028@wilp.bits-pilani.ac.in",
-      email: "2021wa15028@wilp.bits-pilani.ac.in",
-      password: "student123",
-      phone: "+91 9876543228", 
-      course: "M.Tech Software Systems"
-    },
-    {
-      id: "2021wa15029",
-      name: "Vikram Reddy",
-      username: "2021wa15029@wilp.bits-pilani.ac.in",
-      email: "2021wa15029@wilp.bits-pilani.ac.in",
-      password: "student123",
-      phone: "+91 9876543229",
-      course: "M.Tech Software Systems"
-    }
-  ]);
-  const [admins, setAdmins] = useState<Admin[]>([]);
+  const [students, setStudents] = useState<Student[]>(defaultStudents);
   const [staff, setStaff] = useState<Staff[]>([]);
+  const [admins, setAdmins] = useState<Admin[]>([]);
   const [courses, setCourses] = useState<any[]>(coursesData);
   const [selectedCourse, setSelectedCourse] = useState<any>(null);
   const [showCourseDetails, setShowCourseDetails] = useState(false);

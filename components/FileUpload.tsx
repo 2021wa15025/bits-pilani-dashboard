@@ -5,10 +5,12 @@ import { Card, CardContent } from "./ui/card";
 import { Progress } from "./ui/progress";
 import { toast } from "sonner";
 import { projectId, publicAnonKey } from "../utils/supabase/info";
+import { supabaseStorage, type SupabaseFile } from "../utils/supabase/storage";
+import { localFileStorage, type LocalFile } from "../utils/localFileStorage";
 
 interface FileUploadProps {
   noteId: string;
-  onFilesUploaded: (files: any[]) => void;
+  onFilesUploaded: (files: (SupabaseFile | LocalFile)[]) => void;
   accept?: string;
   maxSize?: number; // in bytes
   multiple?: boolean;
@@ -73,26 +75,33 @@ export function FileUpload({
     return null;
   };
 
-  const uploadFile = async (file: File): Promise<any> => {
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('noteId', noteId);
-
-    const response = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-917daa5d/upload`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${publicAnonKey}`
-      },
-      body: formData
-    });
-
-    const result = await response.json();
+  const uploadFile = async (file: File): Promise<SupabaseFile | LocalFile> => {
+    console.log('Attempting to upload file:', file.name);
     
-    if (!response.ok) {
-      throw new Error(result.error || 'Upload failed');
+    // First try Supabase storage
+    try {
+      const supabaseFile = await supabaseStorage.uploadFile(file, noteId);
+      console.log('File uploaded to Supabase successfully:', supabaseFile);
+      toast.success(`${file.name} uploaded to cloud storage`);
+      return supabaseFile;
+    } catch (supabaseError) {
+      console.warn('Supabase upload failed, trying local storage fallback:', supabaseError);
+      
+      // Fallback to local storage
+      try {
+        if (!localFileStorage.isAvailable()) {
+          throw new Error('Local storage is not available');
+        }
+        
+        const localFile = await localFileStorage.uploadFile(file, noteId);
+        console.log('File stored locally successfully:', localFile);
+        toast.info(`${file.name} stored locally (cloud unavailable)`);
+        return localFile;
+      } catch (localError) {
+        console.error('Both storage methods failed:', { supabaseError, localError });
+        throw new Error(`Failed to upload ${file.name}: ${localError.message}`);
+      }
     }
-
-    return result.file;
   };
 
   const handleFiles = useCallback(async (files: FileList) => {
@@ -154,7 +163,10 @@ export function FileUpload({
         );
 
         uploadedFiles.push(uploadedFile);
-        toast.success(`${file.name} uploaded successfully`);
+        
+        // Different success message based on storage type
+        const storageType = 'id' in uploadedFile && uploadedFile.id.startsWith('local_') ? 'locally' : 'to cloud';
+        // toast.success already called in uploadFile function
 
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Upload failed';

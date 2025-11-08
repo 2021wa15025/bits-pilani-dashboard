@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, Clock, MapPin, Edit3, AlertCircle, BookOpen, Users, Presentation, Briefcase, GraduationCap, Heart, Microscope, UserCheck } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, Clock, Edit3, AlertCircle, BookOpen, Users, Presentation, Briefcase, GraduationCap, Heart, Microscope, UserCheck, ChevronDown } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
@@ -34,9 +34,23 @@ function CalendarPage({ events, onEventsChange, courses, onEventClick, onNotific
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [isCreateEventOpen, setIsCreateEventOpen] = useState(false);
   const [isEditEventOpen, setIsEditEventOpen] = useState(false);
+  const [isDateEventsOpen, setIsDateEventsOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [viewMode, setViewMode] = useState<"month" | "week" | "day">("month");
 
+  // Auto-suggestion state for type
+  const [typeInput, setTypeInput] = useState("");
+  const [showTypeSuggestions, setShowTypeSuggestions] = useState(false);
+  const [filteredTypes, setFilteredTypes] = useState<string[]>([]);
+  const typeInputRef = useRef<HTMLInputElement>(null);
+  const typeSuggestionsRef = useRef<HTMLDivElement>(null);
+  
+  // Auto-suggestion state for course
+  const [courseInput, setCourseInput] = useState("");
+  const [showCourseSuggestions, setShowCourseSuggestions] = useState(false);
+  const [filteredCourses, setFilteredCourses] = useState<Array<{ id: string; title: string; code: string }>>([]);
+  const courseInputRef = useRef<HTMLInputElement>(null);
+  const courseSuggestionsRef = useRef<HTMLDivElement>(null);
 
   const [newEvent, setNewEvent] = useState({
     title: "",
@@ -44,9 +58,133 @@ function CalendarPage({ events, onEventsChange, courses, onEventClick, onNotific
     time: "",
     type: "assignment" as Event["type"],
     description: "",
-    course: "",
-    location: ""
+    course: ""
   });
+
+  // Event type options
+  const eventTypes = [
+    { value: "assignment", label: "Assignment" },
+    { value: "deadline", label: "Deadline" },
+    { value: "exam", label: "Exam" },
+    { value: "class", label: "Class" },
+    { value: "presentation", label: "Presentation" },
+    { value: "meeting", label: "Meeting" },
+    { value: "viva", label: "Viva" },
+    { value: "lab_assessment", label: "Lab Assessment" },
+    { value: "holiday", label: "Holiday" }
+  ];
+
+  // Auto-suggestion functions for type
+  const handleTypeInputChange = (value: string) => {
+    setTypeInput(value);
+    setNewEvent({...newEvent, type: value as Event["type"]});
+    
+    // Filter types based on input
+    if (value.trim()) {
+      const filtered = eventTypes
+        .filter(type => type.label.toLowerCase().includes(value.toLowerCase()))
+        .map(type => type.label);
+      setFilteredTypes(filtered);
+      setShowTypeSuggestions(filtered.length > 0);
+    } else {
+      setFilteredTypes([]);
+      setShowTypeSuggestions(false);
+    }
+  };
+
+  const selectType = (typeLabel: string) => {
+    const typeOption = eventTypes.find(type => type.label === typeLabel);
+    if (typeOption) {
+      setTypeInput(typeLabel);
+      setNewEvent({...newEvent, type: typeOption.value as Event["type"]});
+      setShowTypeSuggestions(false);
+    }
+  };
+
+  // Auto-suggestion functions for course
+  const handleCourseInputChange = (value: string) => {
+    setCourseInput(value);
+    setNewEvent({...newEvent, course: value});
+    
+    // Filter courses based on input
+    if (value.trim()) {
+      const filtered = courses.filter(course => 
+        course.title.toLowerCase().includes(value.toLowerCase()) ||
+        course.code.toLowerCase().includes(value.toLowerCase())
+      );
+      setFilteredCourses(filtered);
+      setShowCourseSuggestions(filtered.length > 0);
+    } else {
+      setFilteredCourses([]);
+      setShowCourseSuggestions(false);
+    }
+  };
+
+  const selectCourse = (course: { id: string; title: string; code: string }) => {
+    const courseText = `${course.code} - ${course.title}`;
+    setCourseInput(courseText);
+    setNewEvent({...newEvent, course: course.code});
+    setShowCourseSuggestions(false);
+  };
+
+  // Focus and blur handlers
+  const handleTypeInputFocus = () => {
+    if (typeInput.trim() && filteredTypes.length > 0) {
+      setShowTypeSuggestions(true);
+    }
+  };
+
+  const handleCourseInputFocus = () => {
+    if (courseInput.trim() && filteredCourses.length > 0) {
+      setShowCourseSuggestions(true);
+    }
+  };
+
+  const handleTypeInputBlur = (e: React.FocusEvent) => {
+    setTimeout(() => {
+      if (!typeSuggestionsRef.current?.contains(e.relatedTarget as Node)) {
+        setShowTypeSuggestions(false);
+      }
+    }, 150);
+  };
+
+  const handleCourseInputBlur = (e: React.FocusEvent) => {
+    setTimeout(() => {
+      if (!courseSuggestionsRef.current?.contains(e.relatedTarget as Node)) {
+        setShowCourseSuggestions(false);
+      }
+    }, 150);
+  };
+
+  // Close suggestions when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      // Type suggestions
+      if (
+        typeInputRef.current &&
+        !typeInputRef.current.contains(event.target as Node) &&
+        typeSuggestionsRef.current &&
+        !typeSuggestionsRef.current.contains(event.target as Node)
+      ) {
+        setShowTypeSuggestions(false);
+      }
+      
+      // Course suggestions
+      if (
+        courseInputRef.current &&
+        !courseInputRef.current.contains(event.target as Node) &&
+        courseSuggestionsRef.current &&
+        !courseSuggestionsRef.current.contains(event.target as Node)
+      ) {
+        setShowCourseSuggestions(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   // Default holidays and academic events
   const defaultEvents: Event[] = [
@@ -73,6 +211,36 @@ function CalendarPage({ events, onEventsChange, courses, onEventClick, onNotific
       time: "00:00", 
       type: "holiday",
       description: "Festival Holiday - Diwali"
+    },
+    // November 2025 test events
+    {
+      id: "test-nov-9",
+      title: "Software Engineering Project Demo",
+      date: "2025-11-09",
+      time: "10:30",
+      type: "presentation",
+      description: "Final project demonstration for Software Engineering course",
+      course: "SSWT ZC528",
+      location: "Computer Lab 1"
+    },
+    {
+      id: "test-nov-9-2",
+      title: "Database Lab Submission",
+      date: "2025-11-09",
+      time: "23:59",
+      type: "deadline",
+      description: "Submit database normalization assignment",
+      course: "SSWT ZC337"
+    },
+    {
+      id: "test-nov-8",
+      title: "Network Security Viva",
+      date: "2025-11-08",
+      time: "14:00",
+      type: "viva",
+      description: "Oral examination on network security protocols",
+      course: "SSWT ZC467",
+      location: "Faculty Room 205"
     },
     {
       id: "exam-1",
@@ -166,7 +334,7 @@ function CalendarPage({ events, onEventsChange, courses, onEventClick, onNotific
   };
 
   const getEventsForDate = (date: Date) => {
-    // Format date in IST (Indian Standard Time) YYYY-MM-DD format
+    // Format date consistently to avoid timezone issues
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
@@ -174,12 +342,9 @@ function CalendarPage({ events, onEventsChange, courses, onEventClick, onNotific
     
     const matchingEvents = allEvents.filter(event => event.date === dateString);
     
-    // Debug logging for today's events (IST)
-    if (date.toDateString() === new Date().toDateString()) {
-      console.log(`📅 Today (IST): ${dateString}`);
-      console.log(`📅 Total events: ${allEvents.length}`);
-      console.log(`📅 Events today:`, matchingEvents.map(e => ({ title: e.title, date: e.date })));
-    }
+    // Debug logging
+    console.log(`📅 Checking date: ${date.toDateString()} -> ${dateString}`);
+    console.log(`📅 Found ${matchingEvents.length} events:`, matchingEvents.map(e => ({ title: e.title, date: e.date })));
     
     return matchingEvents;
   };
@@ -225,8 +390,7 @@ function CalendarPage({ events, onEventsChange, courses, onEventClick, onNotific
         time: newEvent.time,
         type: newEvent.type,
         description: newEvent.description,
-        course: newEvent.course,
-        location: newEvent.location
+        course: newEvent.course
       };
       
       console.log(`✅ Event created (IST): "${event.title}" on ${event.date} at ${event.time}`);
@@ -252,8 +416,7 @@ function CalendarPage({ events, onEventsChange, courses, onEventClick, onNotific
         time: "",
         type: "assignment",
         description: "",
-        course: "",
-        location: ""
+        course: ""
       });
       setIsCreateEventOpen(false);
     }
@@ -267,8 +430,7 @@ function CalendarPage({ events, onEventsChange, courses, onEventClick, onNotific
       time: event.time,
       type: event.type,
       description: event.description,
-      course: event.course || "",
-      location: event.location || ""
+      course: event.course || ""
     });
     setIsEditEventOpen(true);
   };
@@ -284,8 +446,7 @@ function CalendarPage({ events, onEventsChange, courses, onEventClick, onNotific
               time: newEvent.time,
               type: newEvent.type,
               description: newEvent.description,
-              course: newEvent.course,
-              location: newEvent.location
+              course: newEvent.course
             }
           : event
       );
@@ -308,8 +469,7 @@ function CalendarPage({ events, onEventsChange, courses, onEventClick, onNotific
             time: newEvent.time,
             type: newEvent.type,
             description: newEvent.description,
-            course: newEvent.course,
-            location: newEvent.location
+            course: newEvent.course
           }
         });
       }
@@ -320,8 +480,7 @@ function CalendarPage({ events, onEventsChange, courses, onEventClick, onNotific
         time: "",
         type: "assignment",
         description: "",
-        course: "",
-        location: ""
+        course: ""
       });
       setEditingEvent(null);
       setIsEditEventOpen(false);
@@ -357,8 +516,7 @@ function CalendarPage({ events, onEventsChange, courses, onEventClick, onNotific
         time: "",
         type: "assignment",
         description: "",
-        course: "",
-        location: ""
+        course: ""
       });
       setEditingEvent(null);
       setIsEditEventOpen(false);
@@ -366,12 +524,29 @@ function CalendarPage({ events, onEventsChange, courses, onEventClick, onNotific
   };
 
   const handleDateClick = (date: Date) => {
+    const dayEvents = getEventsForDate(date);
     setSelectedDate(date);
-    setNewEvent(prev => ({
-      ...prev,
-      date: date.toISOString().split('T')[0]
-    }));
-    setIsCreateEventOpen(true);
+    
+    console.log(`🎯 Date clicked: ${date.toDateString()}`);
+    console.log(`🎯 Events found: ${dayEvents.length}`);
+    
+    if (dayEvents.length > 0) {
+      // If there are events on this date, show them
+      setIsDateEventsOpen(true);
+    } else {
+      // If no events, open create event dialog with pre-filled date
+      // Use same date formatting as getEventsForDate to ensure consistency
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const dateString = `${year}-${month}-${day}`;
+      
+      setNewEvent(prev => ({
+        ...prev,
+        date: dateString
+      }));
+      setIsCreateEventOpen(true);
+    }
   };
 
   const upcomingEvents = allEvents
@@ -408,90 +583,117 @@ function CalendarPage({ events, onEventsChange, courses, onEventClick, onNotific
                 Add a new event to your calendar with course assignment and details.
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="event-title">Title</Label>
+            <div className="space-y-6 py-2">
+              <div className="space-y-2">
+                <Label htmlFor="event-title" className="text-sm font-medium">Title</Label>
                 <Input
                   id="event-title"
                   value={newEvent.title}
                   onChange={(e) => setNewEvent({...newEvent, title: e.target.value})}
                   placeholder="Event title..."
+                  className="h-10"
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="event-date">Date</Label>
+                <div className="space-y-2">
+                  <Label htmlFor="event-date" className="text-sm font-medium">Date</Label>
                   <Input
                     id="event-date"
                     type="date"
                     value={newEvent.date}
                     onChange={(e) => setNewEvent({...newEvent, date: e.target.value})}
+                    className="h-10"
                   />
                 </div>
-                <div>
-                  <Label htmlFor="event-time">Time</Label>
+                <div className="space-y-2">
+                  <Label htmlFor="event-time" className="text-sm font-medium">Time</Label>
                   <Input
                     id="event-time"
                     type="time"
                     value={newEvent.time}
                     onChange={(e) => setNewEvent({...newEvent, time: e.target.value})}
+                    className="h-10"
                   />
                 </div>
               </div>
-              <div>
-                <Label htmlFor="event-type">Type</Label>
-                <Select value={newEvent.type} onValueChange={(value: Event["type"]) => setNewEvent({...newEvent, type: value})}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="assignment">Assignment</SelectItem>
-                    <SelectItem value="deadline">Deadline</SelectItem>
-                    <SelectItem value="exam">Exam</SelectItem>
-                    <SelectItem value="class">Class</SelectItem>
-                    <SelectItem value="presentation">Presentation</SelectItem>
-                    <SelectItem value="meeting">Meeting</SelectItem>
-                    <SelectItem value="viva">Viva</SelectItem>
-                    <SelectItem value="lab_assessment">Lab Assessment</SelectItem>
-                    <SelectItem value="holiday">Holiday</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="space-y-2">
+                <Label htmlFor="event-type" className="text-sm font-medium">Type</Label>
+                <div className="relative">
+                  <Input
+                    ref={typeInputRef}
+                    value={typeInput}
+                    onChange={(e) => handleTypeInputChange(e.target.value)}
+                    onFocus={handleTypeInputFocus}
+                    onBlur={handleTypeInputBlur}
+                    placeholder="Type to search event types..."
+                    className="h-10 pr-8"
+                  />
+                  <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                  
+                  {/* Auto-suggestion dropdown */}
+                  {showTypeSuggestions && filteredTypes.length > 0 && (
+                    <div
+                      ref={typeSuggestionsRef}
+                      className="absolute z-50 w-full bg-white border border-border rounded-md shadow-lg mt-1 max-h-60 overflow-y-auto"
+                    >
+                      {filteredTypes.map((typeLabel) => (
+                        <div
+                          key={typeLabel}
+                          className="px-3 py-2 hover:bg-accent cursor-pointer border-b border-border last:border-b-0"
+                          onClick={() => selectType(typeLabel)}
+                        >
+                          <p className="font-medium text-card-foreground">{typeLabel}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-              <div>
-                <Label htmlFor="event-course">Course</Label>
-                <Select value={newEvent.course} onValueChange={(value) => setNewEvent({...newEvent, course: value})}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a course" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {courses.map(course => (
-                      <SelectItem key={course.id} value={course.code}>
-                        {course.code} - {course.title}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="space-y-2">
+                <Label htmlFor="event-course" className="text-sm font-medium">Course</Label>
+                <div className="relative">
+                  <Input
+                    ref={courseInputRef}
+                    value={courseInput}
+                    onChange={(e) => handleCourseInputChange(e.target.value)}
+                    onFocus={handleCourseInputFocus}
+                    onBlur={handleCourseInputBlur}
+                    placeholder="Type to search courses..."
+                    className="h-10 pr-8"
+                  />
+                  <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                  
+                  {/* Auto-suggestion dropdown */}
+                  {showCourseSuggestions && filteredCourses.length > 0 && (
+                    <div
+                      ref={courseSuggestionsRef}
+                      className="absolute z-50 w-full bg-white border border-border rounded-md shadow-lg mt-1 max-h-60 overflow-y-auto"
+                    >
+                      {filteredCourses.map((course) => (
+                        <div
+                          key={course.id}
+                          className="px-3 py-2 hover:bg-accent cursor-pointer border-b border-border last:border-b-0"
+                          onClick={() => selectCourse(course)}
+                        >
+                          <p className="font-medium text-card-foreground">{course.code} - {course.title}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-              <div>
-                <Label htmlFor="event-location">Location (optional)</Label>
-                <Input
-                  id="event-location"
-                  value={newEvent.location}
-                  onChange={(e) => setNewEvent({...newEvent, location: e.target.value})}
-                  placeholder="Location..."
-                />
-              </div>
-              <div>
-                <Label htmlFor="event-description">Description</Label>
+              <div className="space-y-2">
+                <Label htmlFor="event-description" className="text-sm font-medium">Description</Label>
                 <Textarea
                   id="event-description"
                   value={newEvent.description}
                   onChange={(e) => setNewEvent({...newEvent, description: e.target.value})}
                   placeholder="Event description..."
                   rows={3}
+                  className="resize-none"
                 />
               </div>
-              <div className="flex justify-end gap-2">
+              <div className="flex justify-end gap-3 pt-4">
                 <Button variant="outline" onClick={() => setIsCreateEventOpen(false)}>
                   Cancel
                 </Button>
@@ -512,87 +714,114 @@ function CalendarPage({ events, onEventsChange, courses, onEventClick, onNotific
                 Update the event details below.
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="edit-event-title">Title</Label>
+            <div className="space-y-6 py-2">
+              <div className="space-y-2">
+                <Label htmlFor="edit-event-title" className="text-sm font-medium">Title</Label>
                 <Input
                   id="edit-event-title"
                   value={newEvent.title}
                   onChange={(e) => setNewEvent({...newEvent, title: e.target.value})}
                   placeholder="Event title..."
+                  className="h-10"
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="edit-event-date">Date</Label>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-event-date" className="text-sm font-medium">Date</Label>
                   <Input
                     id="edit-event-date"
                     type="date"
                     value={newEvent.date}
                     onChange={(e) => setNewEvent({...newEvent, date: e.target.value})}
+                    className="h-10"
                   />
                 </div>
-                <div>
-                  <Label htmlFor="edit-event-time">Time</Label>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-event-time" className="text-sm font-medium">Time</Label>
                   <Input
                     id="edit-event-time"
                     type="time"
                     value={newEvent.time}
                     onChange={(e) => setNewEvent({...newEvent, time: e.target.value})}
+                    className="h-10"
                   />
                 </div>
               </div>
-              <div>
-                <Label htmlFor="edit-event-type">Type</Label>
-                <Select value={newEvent.type} onValueChange={(value: Event["type"]) => setNewEvent({...newEvent, type: value})}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="assignment">Assignment</SelectItem>
-                    <SelectItem value="deadline">Deadline</SelectItem>
-                    <SelectItem value="exam">Exam</SelectItem>
-                    <SelectItem value="class">Class</SelectItem>
-                    <SelectItem value="presentation">Presentation</SelectItem>
-                    <SelectItem value="meeting">Meeting</SelectItem>
-                    <SelectItem value="viva">Viva</SelectItem>
-                    <SelectItem value="lab_assessment">Lab Assessment</SelectItem>
-                    <SelectItem value="holiday">Holiday</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="space-y-2">
+                <Label htmlFor="edit-event-type" className="text-sm font-medium">Type</Label>
+                <div className="relative">
+                  <Input
+                    ref={typeInputRef}
+                    value={typeInput}
+                    onChange={(e) => handleTypeInputChange(e.target.value)}
+                    onFocus={handleTypeInputFocus}
+                    onBlur={handleTypeInputBlur}
+                    placeholder="Type to search event types..."
+                    className="h-10 pr-8"
+                  />
+                  <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                  
+                  {/* Auto-suggestion dropdown */}
+                  {showTypeSuggestions && filteredTypes.length > 0 && (
+                    <div
+                      ref={typeSuggestionsRef}
+                      className="absolute z-50 w-full bg-white border border-border rounded-md shadow-lg mt-1 max-h-60 overflow-y-auto"
+                    >
+                      {filteredTypes.map((typeLabel) => (
+                        <div
+                          key={typeLabel}
+                          className="px-3 py-2 hover:bg-accent cursor-pointer border-b border-border last:border-b-0"
+                          onClick={() => selectType(typeLabel)}
+                        >
+                          <p className="font-medium text-card-foreground">{typeLabel}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-              <div>
-                <Label htmlFor="edit-event-course">Course</Label>
-                <Select value={newEvent.course} onValueChange={(value) => setNewEvent({...newEvent, course: value})}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a course" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {courses.map(course => (
-                      <SelectItem key={course.id} value={course.code}>
-                        {course.code} - {course.title}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="space-y-2">
+                <Label htmlFor="edit-event-course" className="text-sm font-medium">Course</Label>
+                <div className="relative">
+                  <Input
+                    ref={courseInputRef}
+                    value={courseInput}
+                    onChange={(e) => handleCourseInputChange(e.target.value)}
+                    onFocus={handleCourseInputFocus}
+                    onBlur={handleCourseInputBlur}
+                    placeholder="Type to search courses..."
+                    className="h-10 pr-8"
+                  />
+                  <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                  
+                  {/* Auto-suggestion dropdown */}
+                  {showCourseSuggestions && filteredCourses.length > 0 && (
+                    <div
+                      ref={courseSuggestionsRef}
+                      className="absolute z-50 w-full bg-white border border-border rounded-md shadow-lg mt-1 max-h-60 overflow-y-auto"
+                    >
+                      {filteredCourses.map((course) => (
+                        <div
+                          key={course.id}
+                          className="px-3 py-2 hover:bg-accent cursor-pointer border-b border-border last:border-b-0"
+                          onClick={() => selectCourse(course)}
+                        >
+                          <p className="font-medium text-card-foreground">{course.code} - {course.title}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-              <div>
-                <Label htmlFor="edit-event-location">Location (optional)</Label>
-                <Input
-                  id="edit-event-location"
-                  value={newEvent.location}
-                  onChange={(e) => setNewEvent({...newEvent, location: e.target.value})}
-                  placeholder="Location..."
-                />
-              </div>
-              <div>
-                <Label htmlFor="edit-event-description">Description</Label>
+              <div className="space-y-2">
+                <Label htmlFor="edit-event-description" className="text-sm font-medium">Description</Label>
                 <Textarea
                   id="edit-event-description"
                   value={newEvent.description}
                   onChange={(e) => setNewEvent({...newEvent, description: e.target.value})}
                   placeholder="Event description..."
                   rows={3}
+                  className="resize-none"
                 />
               </div>
               {/* Action buttons with Delete option */}
@@ -612,6 +841,107 @@ function CalendarPage({ events, onEventsChange, courses, onEventClick, onNotific
                     Update Event
                   </Button>
                 </div>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Date Events Dialog - Show events for selected date */}
+        <Dialog open={isDateEventsOpen} onOpenChange={setIsDateEventsOpen}>
+          <DialogContent className="sm:max-w-[600px]">
+            <DialogHeader>
+              <DialogTitle>
+                Events for {selectedDate?.toLocaleDateString('en-US', { 
+                  weekday: 'long', 
+                  year: 'numeric', 
+                  month: 'long', 
+                  day: 'numeric' 
+                })}
+              </DialogTitle>
+              <DialogDescription>
+                View and manage events for this date
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              {selectedDate && getEventsForDate(selectedDate).length > 0 ? (
+                <div className="space-y-3">
+                  {getEventsForDate(selectedDate).map((event) => {
+                    const IconComponent = getEventTypeIcon(event.type);
+                    const isUserEvent = !defaultEvents.find(de => de.id === event.id);
+                    
+                    return (
+                      <div
+                        key={event.id}
+                        className={`p-4 rounded-lg border ${getEventTypeColor(event.type)} hover:shadow-md transition-all duration-200`}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-start gap-3 flex-1">
+                            <IconComponent className="w-5 h-5 mt-0.5 flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-semibold text-sm mb-1">{event.title}</h4>
+                              <div className="flex items-center gap-4 text-xs opacity-90 mb-2">
+                                <div className="flex items-center gap-1">
+                                  <Clock className="w-3 h-3" />
+                                  <span>{event.time}</span>
+                                </div>
+                                {event.course && (
+                                  <Badge variant="secondary" className="text-xs">
+                                    {event.course}
+                                  </Badge>
+                                )}
+                              </div>
+                              {event.description && (
+                                <p className="text-xs opacity-80 leading-relaxed">
+                                  {event.description}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          {isUserEvent && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                handleEditEvent(event);
+                                setIsDateEventsOpen(false);
+                              }}
+                              className="ml-2 opacity-70 hover:opacity-100"
+                            >
+                              <Edit3 className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <CalendarIcon className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
+                  <p className="text-muted-foreground">No events scheduled for this date</p>
+                </div>
+              )}
+              
+              <div className="flex justify-between pt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    if (selectedDate) {
+                      setNewEvent(prev => ({
+                        ...prev,
+                        date: selectedDate.toISOString().split('T')[0]
+                      }));
+                      setIsDateEventsOpen(false);
+                      setIsCreateEventOpen(true);
+                    }
+                  }}
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Event
+                </Button>
+                <Button variant="outline" onClick={() => setIsDateEventsOpen(false)}>
+                  Close
+                </Button>
               </div>
             </div>
           </DialogContent>
@@ -655,49 +985,76 @@ function CalendarPage({ events, onEventsChange, courses, onEventClick, onNotific
                 {calendarDays.map((day, index) => {
                   const dayEvents = getEventsForDate(day.date);
                   const isToday = day.date.toDateString() === new Date().toDateString();
+                  const isSelected = selectedDate?.toDateString() === day.date.toDateString();
                   const dayOfWeek = day.date.getDay();
                   const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+                  const hasEvents = dayEvents.length > 0;
                   
                   return (
                     <div
                       key={index}
-                      className={`min-h-[80px] p-1 border border-border rounded cursor-pointer hover:bg-accent transition-colors ${
-                        !day.isCurrentMonth ? 'bg-muted text-muted-foreground' : 'bg-card text-card-foreground'
-                      } ${isToday ? 'bg-accent/50 border-primary' : ''}`}
+                      className={`min-h-[80px] p-1 border border-border rounded cursor-pointer transition-all duration-200 ${
+                        !day.isCurrentMonth ? 'bg-muted text-muted-foreground opacity-50' : 'bg-card text-card-foreground'
+                      } ${isToday ? 'bg-primary/10 border-primary ring-1 ring-primary/20' : ''} ${
+                        isSelected ? 'bg-accent border-accent-foreground ring-1 ring-accent-foreground/20' : ''
+                      } ${hasEvents ? 'hover:bg-primary/5' : 'hover:bg-accent'}`}
                       onClick={() => handleDateClick(day.date)}
+                      title={hasEvents ? `${dayEvents.length} event${dayEvents.length > 1 ? 's' : ''} on this date` : 'Click to add event'}
                     >
-                      <div className={`text-sm font-medium mb-1 ${isToday ? 'text-primary' : 'text-muted-foreground'}`}>
-                        {day.date.getDate()}
+                      <div className="flex items-center justify-between mb-1">
+                        <div className={`text-sm font-medium ${
+                          isToday ? 'text-primary font-bold' : 
+                          isSelected ? 'text-accent-foreground font-semibold' : 
+                          'text-muted-foreground'
+                        }`}>
+                          {day.date.getDate()}
+                        </div>
+                        {hasEvents && (
+                          <div className="w-2 h-2 bg-primary rounded-full opacity-70"></div>
+                        )}
                       </div>
                       <div className="space-y-1">
                         {dayEvents.slice(0, 2).map((event) => {
                           const IconComponent = getEventTypeIcon(event.type);
+                          const isUserEvent = !defaultEvents.find(de => de.id === event.id);
                           return (
                             <div
                               key={event.id}
-                              className={`text-xs px-1.5 py-0.5 rounded truncate ${getEventTypeColor(event.type)} cursor-pointer hover:opacity-90 transition-opacity flex items-center gap-1`}
+                              className={`text-xs px-1.5 py-0.5 rounded truncate ${getEventTypeColor(event.type)} cursor-pointer hover:opacity-90 transition-opacity flex items-center gap-1 group`}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                // Only allow editing of user-created events (not default events)
-                                if (!defaultEvents.find(de => de.id === event.id)) {
+                                // Show event details for any event, but only allow editing of user events
+                                if (isUserEvent) {
                                   handleEditEvent(event);
+                                } else {
+                                  // For default events, show in the date events dialog
+                                  setSelectedDate(day.date);
+                                  setIsDateEventsOpen(true);
                                 }
                                 // Track event click if callback provided
                                 if (onEventClick) {
                                   onEventClick(event);
                                 }
                               }}
+                              title={`${event.title} at ${event.time}`}
                             >
                               <IconComponent className="w-3 h-3 flex-shrink-0" />
-                              <span className="truncate">{event.title}</span>
-                              {!defaultEvents.find(de => de.id === event.id) && (
-                                <Edit3 className="w-2.5 h-2.5 ml-auto opacity-70" />
+                              <span className="truncate flex-1">{event.title}</span>
+                              {isUserEvent && (
+                                <Edit3 className="w-2.5 h-2.5 ml-auto opacity-0 group-hover:opacity-70 transition-opacity" />
                               )}
                             </div>
                           );
                         })}
                         {dayEvents.length > 2 && (
-                          <div className="text-xs text-muted-foreground pl-1">
+                          <div 
+                            className="text-xs text-primary font-medium pl-1 hover:underline cursor-pointer"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedDate(day.date);
+                              setIsDateEventsOpen(true);
+                            }}
+                          >
                             +{dayEvents.length - 2} more
                           </div>
                         )}
