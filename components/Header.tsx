@@ -10,18 +10,7 @@ import { ProfileEditDialog } from './ProfileEditDialog';
 import MessagingModal from './MessagingModal';
 import { useState, useEffect, useRef } from "react";
 import { Card } from "./ui/card";
-
-interface UserProfile {
-  name: string;
-  id: string;
-  email: string;
-  phone: string;
-  course: string;
-  semester: string;
-  avatar: string;
-  campus?: string;
-  academicYear?: string;
-}
+import { UserProfile } from '../utils/supabase/database';
 
 interface Course {
   id: string;
@@ -660,12 +649,6 @@ export function Header({
         <MessagingModal
           isOpen={isMessagingOpen}
           onClose={() => setIsMessagingOpen(false)}
-          currentUser={{
-            id: userProfile.id,
-            name: userProfile.name,
-            email: userProfile.email,
-            avatar: userProfile.avatar
-          }}
         />
       )}
     </header>
