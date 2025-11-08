@@ -32,6 +32,9 @@ const NoteDetailPage = lazy(() => import("./components/NoteDetailPage"));
 const NoteEditPage = lazy(() => import("./components/NoteEditPage"));
 const UniversityInfoPage = lazy(() => import("./components/UniversityInfoPage"));
 
+// Import SettingsPage
+import { SettingsPage } from "./components/SettingsPage";
+
 // Import data from separate files
 import { coursesData } from "./data/coursesData.ts";
 import { eventsData } from "./data/eventsData.ts";
@@ -1208,7 +1211,12 @@ function AppContent() {
             )}
 
             {activeTab === "settings" && (
-              <div className="p-6"><h2 className="text-2xl font-bold mb-4">Settings</h2><p>Settings page will be implemented here.</p></div>
+              <SettingsPage
+                userProfile={userProfile}
+                theme={theme}
+                onThemeToggle={toggleTheme}
+                onProfileUpdate={handleProfileUpdate}
+              />
             )}
 
             {!["dashboard", "courses", "notes", "calendar", "library", "settings"].includes(activeTab) && (
