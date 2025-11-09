@@ -191,7 +191,7 @@ npm install && npm run dev
 ## 🌐 Deployment
 
 ### **Live Demo**
-🌍 **[Visit Live Site](https://your-netlify-url.netlify.app)**
+🌍 **[Visit Live Site](https://redesigningtaxila.netlify.app/)**
 
 ### **Deployment Options**
 
@@ -304,11 +304,9 @@ This project is developed for **BITS Pilani** and is intended for **educational 
 
 ## 🆘 Support & Contact
 
-For support, questions, or collaboration:
+For support, questions or collaboration:
 
-- **GitHub Issues**: [Create an issue](https://github.com/2021wa15025/bits-pilani-dashboard/issues)
-- **Email**: Contact through BITS Pilani channels
-- **Documentation**: Check our comprehensive guides
+- **Email**: 2021wa15025@wilp.bits-pilani.ac.in
 
 ## 🙏 Acknowledgments
 
