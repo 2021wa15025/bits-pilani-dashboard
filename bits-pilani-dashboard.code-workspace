@@ -1,0 +1,14 @@
+{
+  "folders": [
+    {
+      "path": "."
+    }
+  ],
+  "settings": {
+    "files.exclude": {},
+    "explorer.excludeGitIgnore": false,
+    "files.watcherExclude": {},
+    "search.exclude": {},
+    "explorer.fileNesting.enabled": false
+  }
+}
