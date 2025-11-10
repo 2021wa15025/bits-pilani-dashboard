@@ -7,10 +7,12 @@ import { Badge } from "./ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "./ui/dropdown-menu";
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import { ProfileEditDialog } from './ProfileEditDialog';
-import MessagingModal from './MessagingModal';
-import { useState, useEffect, useRef } from "react";
+import MessagingModal from './SimpleChatModal';
+import { students, getStudentById } from '../data/studentsData';
+import { useState, useRef, useEffect } from "react";
 import { Card } from "./ui/card";
 import { UserProfile } from '../utils/supabase/database';
+import { useAuth } from '../contexts/AuthContext';
 
 interface Course {
   id: string;
@@ -105,8 +107,110 @@ export function Header({
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isMessagingOpen, setIsMessagingOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const searchRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Use Auth hook for consistency with SimpleChatModal
+  const { userEmail } = useAuth();
+
+  // Get unread message count
+  const getUnreadMessageCount = () => {
+    try {
+      const currentUser = students.find(s => s.email === userEmail);
+      if (!currentUser) {
+        return 0;
+      }
+      
+      const storedMessages = localStorage.getItem('simpleMessages');
+      if (!storedMessages) {
+        return 0;
+      }
+      
+      const messages = JSON.parse(storedMessages);
+      const unreadMessages = messages.filter((msg: any) => 
+        msg.to === currentUser.id && !msg.read
+      );
+      
+      return unreadMessages.length;
+    } catch (error) {
+      return 0;
+    }
+  };
+
+  // Update unread count periodically and on storage changes
+  useEffect(() => {
+    const updateUnreadCount = () => {
+      const newCount = getUnreadMessageCount();
+      const oldCount = unreadCount;
+      setUnreadCount(newCount);
+      
+      // Show browser notification for new messages (if permission granted)
+      if (newCount > oldCount && newCount > 0) {
+        showBrowserNotification(newCount - oldCount);
+      }
+    };
+    
+    // Initial update
+    updateUnreadCount();
+    
+    // Listen for localStorage changes (new messages)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'simpleMessages') {
+        updateUnreadCount();
+      }
+    };
+    
+    // Listen for custom storage events (for same-window updates)
+    const handleCustomStorageChange = () => {
+      updateUnreadCount();
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('localStorageUpdate', handleCustomStorageChange);
+    
+    // Periodic update as fallback
+    const interval = setInterval(updateUnreadCount, 2000); // Check every 2 seconds
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('localStorageUpdate', handleCustomStorageChange);
+      clearInterval(interval);
+    };
+  }, [userEmail]);
+
+  // Show browser notification for new messages
+  const showBrowserNotification = (newMessageCount: number) => {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      const title = `${newMessageCount} New Message${newMessageCount > 1 ? 's' : ''}`;
+      const body = 'You have received new messages in BITS Pilani Portal';
+      
+      const notification = new Notification(title, {
+        body,
+        icon: '/favicon.ico', // Add your app icon
+        badge: '/favicon.ico',
+        tag: 'new-message', // Prevent duplicate notifications
+        requireInteraction: false,
+      });
+      
+      // Auto-close after 5 seconds
+      setTimeout(() => notification.close(), 5000);
+      
+      // Focus app when notification is clicked
+      notification.onclick = () => {
+        window.focus();
+        setIsMessagingOpen(true);
+        notification.close();
+      };
+    } else if ('Notification' in window && Notification.permission === 'default') {
+      // Request permission
+      Notification.requestPermission().then(permission => {
+        if (permission === 'granted') {
+          showBrowserNotification(newMessageCount);
+        }
+      });
+    }
+  };
 
   // Deduplicate notifications and announcements by ID to prevent React key errors
   const uniqueNotifications = Array.from(
@@ -459,10 +563,22 @@ export function Header({
 
         {/* Messages */}
         <button
-          onClick={() => setIsMessagingOpen(true)}
-          className="rounded-lg hover:bg-white/10 transition-colors text-white w-8 h-8 xs:w-9 xs:h-9 sm:w-10 sm:h-10 flex items-center justify-center"
+          onClick={() => {
+            setIsMessagingOpen(true);
+            // Refresh unread count when opening messaging
+            setTimeout(() => setUnreadCount(getUnreadMessageCount()), 100);
+          }}
+          className="rounded-lg hover:bg-white/10 transition-colors text-white w-8 h-8 xs:w-9 xs:h-9 sm:w-10 sm:h-10 flex items-center justify-center relative"
         >
           <MessageCircle className="w-4 h-4 xs:w-5 xs:h-5 text-white" />
+          {unreadCount > 0 && (
+            <Badge 
+              variant="destructive" 
+              className="absolute -top-1 -right-1 h-4 w-4 p-0 text-xs flex items-center justify-center min-w-4 rounded-full"
+            >
+              {unreadCount > 99 ? '99+' : unreadCount}
+            </Badge>
+          )}
         </button>
 
         {/* Theme Toggle - Now visible on all screen sizes */}
@@ -648,7 +764,11 @@ export function Header({
       {userProfile && (
         <MessagingModal
           isOpen={isMessagingOpen}
-          onClose={() => setIsMessagingOpen(false)}
+          onClose={() => {
+            setIsMessagingOpen(false);
+            // Refresh unread count when closing messaging
+            setTimeout(() => setUnreadCount(getUnreadMessageCount()), 100);
+          }}
         />
       )}
     </header>
