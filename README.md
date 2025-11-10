@@ -1,10 +1,13 @@
 # BITS Pilani Student Dashboard
 
-A modern, responsive student dashboard application built with React, TypeScript, and Tailwind CSS.
+A modern, responsive student dashboard application built with React, TypeScript and Tailwind CSS.
+
+### **Live Demo**
+🌍 **[Visit Live Site](https://redesigningtaxila.netlify.app/)**
 
 ## 🏆 Project Overview
 
-This is a **comprehensive student portal** for BITS Pilani featuring advanced functionality, modern design, and professional-grade architecture. Built as a final project showcasing full-stack development skills.
+This is a **comprehensive student portal** for BITS Pilani featuring advanced functionality, modern design and professional-grade architecture. Built as a final project showcasing full-stack development skills.
 
 ### 🎯 Key Highlights
 - **88 React Components** - Enterprise-level scale
@@ -190,9 +193,6 @@ npm install && npm run dev
 
 ## 🌐 Deployment
 
-### **Live Demo**
-🌍 **[Visit Live Site](https://your-netlify-url.netlify.app)**
-
 ### **Deployment Options**
 
 #### Netlify (Current)
@@ -304,11 +304,9 @@ This project is developed for **BITS Pilani** and is intended for **educational 
 
 ## 🆘 Support & Contact
 
-For support, questions, or collaboration:
+For support, questions or collaboration:
 
-- **GitHub Issues**: [Create an issue](https://github.com/2021wa15025/bits-pilani-dashboard/issues)
-- **Email**: Contact through BITS Pilani channels
-- **Documentation**: Check our comprehensive guides
+- **Email**: 2021wa15025@wilp.bits-pilani.ac.in
 
 ## 🙏 Acknowledgments
 
